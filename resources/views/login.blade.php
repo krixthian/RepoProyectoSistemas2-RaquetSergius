@@ -3,53 +3,54 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 
-// Ruta para mostrar el formulario de login
-Route::get('/login', function () {
-    return view('login');
-})->name('login');
 
-// Ruta para procesar el login
 Route::post('/login', function (Request $request) {
     $credentials = $request->only('username', 'password');
 
-    // Credenciales estáticas de prueba
-    $validUser = 'admin';
-    $validPassword = '123456';
+    
+    $validCredentials = [
+        'username' => 'admin',
+        'password' => '123456',
+    ];
 
-    if ($credentials['username'] === $validUser && $credentials['password'] === $validPassword) {
+    if ($credentials['username'] === $validCredentials['username'] && 
+        $credentials['password'] === $validCredentials['password']) {
         return redirect('/dashboard')->with('success', 'Inicio de sesión exitoso');
     }
     
     return back()->withErrors(['login' => 'Usuario o contraseña incorrectos'])->withInput();
-});
+})->name('login');
 
-// Vista de login (resources/views/login.blade.php)
 ?>
 
-<!-- login.blade.php -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('css/style.css') }}">
+    <style></style>
 </head>
 <body>
-    <h2>Login</h2>
-    @if ($errors->any())
-        <div style="color: red;">
-            @foreach ($errors->all() as $error)
-                <p>{{ $error }}</p>
-            @endforeach
-        </div>
-    @endif
-    <form method="POST" action="{{ route('login') }}">
-        @csrf
-        <label>Usuario:</label>
-        <input type="text" name="username" required><br>
-        <label>Contraseña:</label>
-        <input type="password" name="password" required><br>
-        <button type="submit">Iniciar sesión</button>
-    </form>
+    <div class="login-container">
+        <h2>Raquet-Sergius</h2>
+        @if ($errors->any())
+            <div class="error">
+                @foreach ($errors->all() as $error)
+                    <p>{{ $error }}</p>
+                @endforeach
+            </div>
+        @endif
+        <form method="POST" action="{{ route('login') }}">
+            @csrf
+            <label for="username">Usuario:</label>
+            <input type="text" id="username" name="username" required>
+            <label for="password">Contraseña:</label>
+            <input type="password" id="password" name="password" required>
+            <button type="submit">Iniciar sesión</button>
+        </form>
+    </div>
 </body>
 </html>
