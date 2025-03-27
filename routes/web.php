@@ -1,13 +1,28 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
+use App\Models\Empleado;
+use Illuminate\Support\Facades\Hash;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/login', function () {
+    return view('login');
+})->name('login');
 
-use App\Http\Controllers\whatsappController;
+Route::post('/login', function (Request $request) {
+    $request->validate([
+        'usuario' => 'required', 
+        'password' => 'required'
+    ]);
 
-Route::get('/webhook/', [whatsappController::class, "token"]);
+    $empleado = Empleado::where('usuario', $request->usuario)->first();
 
-Route::post('/webhook/', [whatsappController::class, "escuchar"]);
+    if ($empleado && Hash::check($request->password, $empleado->contrasena)) {
+        auth()->login($empleado);
+        return redirect()->intended('/dashboard');
+    }
+
+    return back()->withErrors([
+        'usuario' => 'Credenciales incorrectas.',
+    ])->onlyInput('usuario');
+})->name('login.post');
