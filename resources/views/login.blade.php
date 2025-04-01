@@ -52,6 +52,13 @@
                         
                         <button type="submit" class="btn btn-custom w-100">Entrar</button>
                     </form>
+
+                    <div class="text-center mt-3">
+                        <a href="{{ route('password.request') }}" class="text-decoration-none">
+                            ¿Olvidaste la contraseña?
+                        </a>
+                    </div>
+
                 </div>
             </div>
         </div>
