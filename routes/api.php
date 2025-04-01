@@ -15,9 +15,19 @@ use App\Http\Controllers\Api\EquipoController;
 use App\Http\Controllers\Api\PlanMembresiaController;
 use App\Http\Controllers\Api\MembresiaClienteController;
 use App\Http\Controllers\Api\NotificacionController;
+use App\Http\Controllers\chatbot\WebhookController;
+use App\Http\Controllers\chatbot\WhatsappController;
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
+
+
+//para whatsapp
+Route::get('/whatsapp/', [WhatsappController::class, 'token']);
+Route::post('/whatsapp/', [WhatsappController::class, 'escuchar']);
+
+//para dialogflow
+Route::post('/webhook/', [WebhookController::class, 'handleWebhook']);
 
 Route::apiResource('clientes', ClienteController::class);
 Route::apiResource('canchas', CanchaController::class);
