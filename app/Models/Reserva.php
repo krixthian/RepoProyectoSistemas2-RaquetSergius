@@ -9,7 +9,9 @@ class Reserva extends Model
 {
     use HasFactory;
 
+    protected $table = 'reservas';
     protected $primaryKey = 'reserva_id';
+
     protected $fillable = [
         'cliente_id',
         'fecha_hora_inicio',
@@ -20,17 +22,31 @@ class Reserva extends Model
         'pago_completo',
     ];
 
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    // --- AÑADIR O MODIFICAR ESTA SECCIÓN ---
     protected $casts = [
-        'fecha_hora_inicio' => 'datetime',
-        'fecha_hora_fin' => 'datetime',
-        'monto' => 'decimal:2',
-        'pago_completo' => 'boolean',
+        'fecha_hora_inicio' => 'datetime', // Convierte a objeto Carbon
+        'fecha_hora_fin' => 'datetime',    // Convierte a objeto Carbon
+        'pago_completo' => 'boolean',      // Es bueno mantener esto también
+        'monto' => 'decimal:2',          // Si 'monto' es decimal/float, también es bueno castearlo
     ];
+    // ----------------------------------------
 
+
+    // --- Relaciones (como las tenías antes) ---
     public function cliente()
     {
         return $this->belongsTo(Cliente::class, 'cliente_id', 'cliente_id');
     }
 
-    // Puedes agregar aquí las relaciones con otras tablas si las hubiera
+    public function canchas()
+    {
+        return $this->belongsToMany(Cancha::class, 'reservas_canchas', 'reserva_id', 'cancha_id')
+                    ->withPivot('precio_total', 'reserva_cancha_id')
+                    ->withTimestamps();
+    }
 }
