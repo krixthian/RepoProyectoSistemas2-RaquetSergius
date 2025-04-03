@@ -22,12 +22,10 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 
-//para whatsapp
-Route::get('/whatsapp/', [WhatsappController::class, 'token']);
+//para whatsapp y dialogflow
+Route::get('/whatsapp/', [WhatsappController::class, 'verifyToken']);
 Route::post('/whatsapp/', [WhatsappController::class, 'escuchar']);
 
-//para dialogflow
-Route::post('/webhook/', [WebhookController::class, 'handleWebhook']);
 
 Route::apiResource('clientes', ClienteController::class);
 Route::apiResource('canchas', CanchaController::class);
