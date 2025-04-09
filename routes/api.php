@@ -15,7 +15,6 @@ use App\Http\Controllers\Api\EquipoController;
 use App\Http\Controllers\Api\PlanMembresiaController;
 use App\Http\Controllers\Api\MembresiaClienteController;
 use App\Http\Controllers\Api\NotificacionController;
-use App\Http\Controllers\chatbot\WebhookController;
 use App\Http\Controllers\chatbot\WhatsappController;
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
@@ -41,4 +40,6 @@ Route::apiResource('planes-membresia', PlanMembresiaController::class);
 Route::apiResource('membresias-cliente', MembresiaClienteController::class);
 Route::apiResource('notificaciones', NotificacionController::class);
 
-// Aquí podrías agregar rutas personalizadas específicas para tu API
+// rutas personalizadas
+Route::get('/reservas/obtporfecha/{reservadate}', [ReservaController::class, 'getReservasByDate']);
+Route::get('/reservas/cliente/{clienteId}', [ReservaController::class, 'getReservasByCliente']);

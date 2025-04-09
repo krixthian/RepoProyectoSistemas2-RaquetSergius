@@ -4,7 +4,6 @@ use Illuminate\Http\Request;
 use App\Models\Empleado;
 use Illuminate\Support\Facades\Hash;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\WhatsappController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 

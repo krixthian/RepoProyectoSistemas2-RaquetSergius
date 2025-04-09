@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Chatbot\IntentHandlers;
+namespace App\Http\Controllers\Chatbot\IntentHandlers;
 
 use App\Chatbot\IntentHandlerInterface;
 use App\Models\Torneo; // Importa los Models necesarios

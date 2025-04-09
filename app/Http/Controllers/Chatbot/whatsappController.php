@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Chatbot;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Http; // Cliente HTTP de Laravel
+use Illuminate\Support\Facades\Http;
 use Exception;
 
 // Imports para la autenticación de Google
@@ -51,8 +51,8 @@ class whatsappController extends Controller
      * los nombres de los intents deben coincidir con los definidos en Dialogflow.
      */
     private $intentHandlerMap = [
-        'Consulta Disponibilidad Cancha' => ConsultaDisponibilidadCanchaHandler::class,
-        'Información e inscripcion Torneos' => InformacionTorneosHandler::class,
+        'Consulta Disponibilidad Cancha' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaDisponibilidadCanchaHandler::class,
+        'Información e inscripcion Torneos' => \App\Http\Controllers\Chatbot\IntentHandlers\InformacionTorneosHandler::class,
         //'Consulta Horarios Zumba' => ConsultaHorariosZumbaHandler::class,
         // --- mas INTENTS Y SUS HANDLERS ---
         // 'Realizar Reserva Cancha' => RealizarReservaCanchaHandler::class,
