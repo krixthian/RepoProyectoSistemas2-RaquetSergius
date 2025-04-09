@@ -2,14 +2,26 @@
 
 namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
+use App\Services\ReservaService;
 
 use App\Models\Reserva;
 use App\Models\Cliente;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use Carbon\Carbon;
+
+
+
+
 
 class ReservaController extends Controller
 {
+    protected $reservaService;
+
+    // Inyecta el servicio en el constructor
+    public function __construct(ReservaService $reservaService)
+    {
+        $this->reservaService = $reservaService;
+    }
     /**
      * Display a listing of the resource.
      *
@@ -112,4 +124,45 @@ class ReservaController extends Controller
         $reserva->delete();
         return response()->json(['message' => 'Reserva eliminada exitosamente']);
     }
+    public function getReservasByClienteId($cliente_id)
+    {
+        $reservas = Reserva::where('cliente_id', $cliente_id)->with('cliente')->get();
+        return response()->json($reservas);
+    }
+
+    public function getReservasByDate($reservadate)
+    {
+        $reservasArray = $this->reservaService->getReservasConfirmadasPorFecha($reservadate);
+
+        if ($reservasArray === null) {
+            // Hubo un error dentro del servicio (ya debería estar logueado)
+            return response()->json([
+                'error' => 'Error al procesar la solicitud de reservas',
+            ], 500); // Error interno del servidor
+        }
+
+        // Devuelve la respuesta JSON como antes
+        return response()->json($reservasArray);
+    }
+
+    public function getReservasByClienteAndDate(Request $request)
+    {
+        $request->validate([
+            'cliente_id' => 'required|exists:clientes,cliente_id',
+            'fecha' => 'required|date_format:Y-m-d',
+        ]);
+
+        $clienteId = $request->input('cliente_id');
+        $fecha = $request->input('fecha');
+
+        $reservas = Reserva::where('cliente_id', $clienteId)
+            ->whereDate('fecha_hora_inicio', $fecha)
+            ->with('cliente')
+            ->get();
+
+        return response()->json($reservas);
+    }
+
+
+
 }
