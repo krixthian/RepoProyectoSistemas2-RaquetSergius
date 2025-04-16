@@ -113,6 +113,12 @@ class ConsultaDisponibilidadCanchaHandler implements IntentHandlerInterface
                     }
                 }
 
+                $horasOcupadas = [];
+                for ($h = self::HORA_INICIO_OPERACION; $h < self::HORA_FIN_OPERACION; $h++) {
+                    if (!(isset($ocupacionPorHora[$h]) && $ocupacionPorHora[$h] < self::TOTAL_CANCHAS)) {
+                        $horasOcupadas[] = sprintf('%02d:00', $h); // Formato HH:00
+                    }
+                }
                 // --- Construcción de la Respuesta Final ---
 
                 if (empty($horasDisponibles)) {
@@ -120,7 +126,12 @@ class ConsultaDisponibilidadCanchaHandler implements IntentHandlerInterface
                 } else {
                     $responseText = "Para el {$fechaFormateada}, las horas con al menos una cancha disponible (inicio de hora) son:\n";
                     $responseText .= implode("\n", $horasDisponibles); // Lista las horas disponibles
-                    $responseText .= "\n\nPor favor, indica la hora que te gustaría reservar (por ejemplo: 'quiero reservar a las 14:00')."; // Sugiere siguiente paso
+
+                    $responseText .= "\n\nLas horas ocupadas son:\n~";
+                    $responseText .= implode("\n", $horasOcupadas); // Lista las horas ocupadas
+                    $responseText .= "~";
+
+                    $responseText .= "\n\nPor favor, indica la hora que te gustaría reservar (por ejemplo: 'quiero reservar el jueves a las 14:00')."; // Sugiere siguiente paso
                 }
 
                 // Captura de Excepciones Específicas
