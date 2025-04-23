@@ -53,10 +53,10 @@ class whatsappController extends Controller
     private $intentHandlerMap = [
         'Consulta Disponibilidad Cancha' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaDisponibilidadCanchaHandler::class,
         'Información e inscripcion Torneos' => \App\Http\Controllers\Chatbot\IntentHandlers\InformacionTorneosHandler::class,
-        //'Consulta Horarios Zumba' => ConsultaHorariosZumbaHandler::class,
+        'Consulta Horarios Zumba' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaHorariosZumbaHandler::class,
         // --- mas INTENTS Y SUS HANDLERS ---
         'Realizar Reserva Cancha' => \App\Http\Controllers\Chatbot\IntentHandlers\RealizarReservaCanchaHandler::class,
-        // 'cancelar reserva'        => CancelarReservaHandler::class,
+        'cancelar reserva' => \App\Http\Controllers\Chatbot\IntentHandlers\CancelarReservaHandler::class,
         // 'Consulta Reserva'        => ConsultaReservaHandler::class,
         // 'Inscripción Clase Zumba' => InscripcionClaseZumbaHandler::class,
         // 'Eventos Zumba'           => EventosZumbaHandler::class,

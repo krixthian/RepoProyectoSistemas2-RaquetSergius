@@ -32,11 +32,9 @@ class Reserva extends Model
      * Ajusta los casts para que coincidan con las columnas en $fillable y sus tipos de datos.
      */
     protected $casts = [
-        'fecha' => 'date:Y-m-d', // Convierte 'fecha' a un objeto Carbon (solo fecha)
-        // 'hora_inicio'   => 'datetime:H:i:s', // Opcional: Si guardas como TIME, puedes castear a Carbon solo con hora. A menudo se deja como string.
-        // 'hora_fin'      => 'datetime:H:i:s', // Opcional: Ídem hora_inicio.
-        'monto' => 'decimal:2',   // Correcto si la columna es DECIMAL/NUMERIC
-        'pago_completo' => 'boolean',     // Correcto si la columna es BOOLEAN/TINYINT(1)
+        'fecha' => 'date:Y-m-d',
+        'monto' => 'decimal:2',
+        'pago_completo' => 'boolean',
 
     ];
 
