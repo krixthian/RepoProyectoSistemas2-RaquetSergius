@@ -57,7 +57,7 @@ class whatsappController extends Controller
         // --- mas INTENTS Y SUS HANDLERS ---
         'Realizar Reserva Cancha' => \App\Http\Controllers\Chatbot\IntentHandlers\RealizarReservaCanchaHandler::class,
         'cancelar reserva' => \App\Http\Controllers\Chatbot\IntentHandlers\CancelarReservaHandler::class,
-        // 'Consulta Reserva'        => ConsultaReservaHandler::class,
+        'Consulta Reserva' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaReservaHandler::class,
         // 'Inscripción Clase Zumba' => InscripcionClaseZumbaHandler::class,
         // 'Eventos Zumba'           => EventosZumbaHandler::class,
         // 'Ayuda / Información General' => AyudaHandler::class,
