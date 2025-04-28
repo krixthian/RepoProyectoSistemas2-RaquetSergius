@@ -26,6 +26,13 @@ class whatsappController extends Controller
     protected $whatsappBusinessId;
     protected $verifyToken;
 
+    // DATOS UBICACION ---
+    private const LOCATION_LATITUDE = -16.498637;
+    private const LOCATION_LONGITUDE = -68.132286;
+    private const LOCATION_NAME = 'Ubicación de Raquet Sergius';
+    private const LOCATION_ADDRESS = 'Nos encontramos en la calle Ascarrunz!';
+    // -----------------------------------------------------------
+
     public function __construct()
     {
         $this->projectId = env('DIALOGFLOW_PROJECT_ID');
@@ -51,15 +58,20 @@ class whatsappController extends Controller
      * los nombres de los intents deben coincidir con los definidos en Dialogflow.
      */
     private $intentHandlerMap = [
+        //RESERVAS CANCHAS WALLY
         'Consulta Disponibilidad Cancha' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaDisponibilidadCanchaHandler::class,
-        'Información e inscripcion Torneos' => \App\Http\Controllers\Chatbot\IntentHandlers\InformacionTorneosHandler::class,
-        'Consulta Horarios Zumba' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaHorariosZumbaHandler::class,
-        // --- mas INTENTS Y SUS HANDLERS ---
         'Realizar Reserva Cancha' => \App\Http\Controllers\Chatbot\IntentHandlers\RealizarReservaCanchaHandler::class,
         'cancelar reserva' => \App\Http\Controllers\Chatbot\IntentHandlers\CancelarReservaHandler::class,
         'Consulta Reserva' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaReservaHandler::class,
+        //INSCRIPCIONES CLASES ZUMBA 
+        'Consulta Horarios Zumba' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaHorariosZumbaHandler::class,
         // 'Inscripción Clase Zumba' => InscripcionClaseZumbaHandler::class,
         // 'Eventos Zumba'           => EventosZumbaHandler::class,
+
+
+        //'Información e inscripcion Torneos' => \App\Http\Controllers\Chatbot\IntentHandlers\InformacionTorneosHandler::class,
+
+        //OTROS
         // 'Ayuda / Información General' => AyudaHandler::class,
         // 'Contacto Empleado'       => ContactoEmpleadoHandler::class,
         // 'Saludo' => \App\Chatbot\IntentHandlers\SaludoHandler::class, // Ejemplo si es complicado
@@ -99,14 +111,33 @@ class whatsappController extends Controller
                         Log::info("Message from {$senderPhone}: {$messageText}");
 
                         // *** Llama a Dialogflow usando HTTP directa ***
-                        $dialogflowResponseText = $this->processDialogflowViaHttp($messageText, $senderPhone);
+                        $dialogflowResponse = $this->processDialogflowViaHttp($messageText, $senderPhone);
 
-                        if ($dialogflowResponseText) {
-                            $this->sendWhatsAppMessage($senderPhone, $dialogflowResponseText);
+                        // *** Verificar tipo de respuesta y enviar mensaje ***
+                        if ($dialogflowResponse) {
+                            if (is_string($dialogflowResponse)) {
+                                // Respuesta de texto normal
+                                $this->sendWhatsAppMessage($senderPhone, $dialogflowResponse);
+                            } elseif (is_array($dialogflowResponse) && isset($dialogflowResponse['type']) && $dialogflowResponse['type'] === 'location') {
+                                // Respuesta de ubicación
+                                $this->sendWhatsAppLocation(
+                                    $senderPhone,
+                                    $dialogflowResponse['latitude'],
+                                    $dialogflowResponse['longitude'],
+                                    $dialogflowResponse['name'],
+                                    $dialogflowResponse['address']
+                                );
+                            } else {
+                                // Tipo de respuesta no esperado
+                                Log::error("Unexpected response type from Dialogflow processing: " . json_encode($dialogflowResponse));
+                                $this->sendWhatsAppMessage($senderPhone, "Hubo un error inesperado al procesar tu solicitud.");
+                            }
                         } else {
-                            Log::error("No response text received from Dialogflow HTTP processing for message: {$messageText}");
+                            Log::error("No response received from Dialogflow HTTP processing for message: {$messageText}");
                             // $this->sendWhatsAppMessage($senderPhone, "Lo siento, no pude procesar tu solicitud en este momento.");
                         }
+                        // *** Fin Verificación y envío ***
+
                     } else {
                         Log::info('Ignoring non-text message type: ' . ($messageData['type'] ?? 'unknown'));
                     }
@@ -160,7 +191,7 @@ class whatsappController extends Controller
      * @param string $senderId Un ID único para la sesión (ej. número de teléfono).
      * @return string|null El texto de respuesta de Dialogflow o null en caso de error.
      */
-    private function processDialogflowViaHttp(string $message, string $senderId): ?string
+    private function processDialogflowViaHttp(string $message, string $senderId): string|array|null
     {
         if (empty($this->projectId)) {
             Log::error("Dialogflow Project ID not set. Cannot process message.");
@@ -214,7 +245,20 @@ class whatsappController extends Controller
                 // --- Lógica para invocar el Handler ---
                 $responseText = $fulfillmentText; // Respuesta por defecto
 
-                if ($detectedIntent && isset($this->intentHandlerMap[$detectedIntent])) {
+
+                if ($detectedIntent == "ubicacion") {
+                    Log::info("Handling 'ubicacion' intent. Preparing location response.");
+                    $finalResponse = [
+                        'type' => 'location',
+                        'latitude' => self::LOCATION_LATITUDE,
+                        'longitude' => self::LOCATION_LONGITUDE,
+                        'name' => self::LOCATION_NAME,
+                        'address' => self::LOCATION_ADDRESS
+                    ];
+                    return $finalResponse;
+                } elseif ($detectedIntent == "comunicar recepcion") {
+                    return "Claro!, puedes comunicarte con la recepción al número de telefono fijo 2418133";
+                } elseif ($detectedIntent && isset($this->intentHandlerMap[$detectedIntent])) {
                     $handlerClass = $this->intentHandlerMap[$detectedIntent];
                     try {
                         // Usamos el contenedor de servicios de Laravel para instanciar
@@ -293,6 +337,63 @@ class whatsappController extends Controller
             return false;
         }
     }
+
+
+    /**
+     * Envía un mensaje de ubicación a través de la API de WhatsApp Cloud.
+     * @param string $recipient El número de teléfono del destinatario.
+     * @param float $latitude Latitud.
+     * @param float $longitude Longitud.
+     * @param string $name Nombre del lugar (opcional).
+     * @param string $address Dirección del lugar (opcional).
+     * @return bool True si el mensaje se envió (o al menos se intentó), False en caso de error.
+     */
+    private function sendWhatsAppLocation(string $recipient, float $latitude, float $longitude, string $name = '', string $address = ''): bool
+    {
+        if (empty($this->wsToken) || empty($this->whatsappBusinessId)) {
+            Log::error('WhatsApp credentials (token or business ID) not configured.');
+            return false;
+        }
+        try {
+            $url = "https://graph.facebook.com/v22.0/{$this->whatsappBusinessId}/messages";
+            $locationData = [
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+            ];
+            // Añadir nombre y dirección solo si tienen valor
+            if (!empty($name)) {
+                $locationData['name'] = $name;
+            }
+            if (!empty($address)) {
+                $locationData['address'] = $address;
+            }
+
+            $payload = [
+                'messaging_product' => 'whatsapp',
+                'recipient_type' => 'individual',
+                'to' => $recipient,
+                'type' => 'location',
+                'location' => $locationData,
+            ];
+
+            Log::info("Sending WhatsApp LOCATION message to {$recipient}: " . json_encode($locationData));
+            $response = Http::withToken($this->wsToken)->post($url, $payload);
+
+            Log::info('WhatsApp API Response Status: ' . $response->status());
+            Log::debug('WhatsApp API Response Body: ' . $response->body()); // Debug para no llenar logs
+
+            if (!$response->successful()) {
+                Log::error('Error sending WhatsApp LOCATION message: ' . $response->body());
+                return false;
+            }
+            return true;
+        } catch (Exception $e) {
+            Log::error('Exception sending WhatsApp LOCATION message: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+
 
     /**
      * Maneja la verificación inicial del webhook por parte de Meta/WhatsApp.
