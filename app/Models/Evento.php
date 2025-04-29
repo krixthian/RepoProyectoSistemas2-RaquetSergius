@@ -9,6 +9,7 @@ class Evento extends Model
 {
     use HasFactory;
 
+    protected $table = 'eventos';
     protected $primaryKey = 'evento_id';
     protected $fillable = [
         'nombre',
@@ -25,5 +26,8 @@ class Evento extends Model
         'precio_inscripcion' => 'decimal:2',
     ];
 
-    // Puedes agregar aquí las relaciones con otras tablas si las hubiera
+    public function torneos() // Un evento puede tener múltiples torneos
+    {
+        return $this->hasMany(Torneo::class, 'evento_id', 'evento_id');
+    }
 }

@@ -9,12 +9,15 @@ class AreaZumba extends Model
 {
     use HasFactory;
 
+    protected $table = 'areas_zumba';
+
     protected $primaryKey = 'area_id';
     protected $fillable = [
         'nombre',
         'capacidad',
         'disponible',
         'precio_clase',
+        'img_horario', // Ajustado a SQL
     ];
 
     protected $casts = [
@@ -23,5 +26,8 @@ class AreaZumba extends Model
         'capacidad' => 'integer',
     ];
 
-    // Puedes agregar aquí las relaciones con otras tablas si las hubiera
+    public function clases()
+    {
+        return $this->hasMany(ClaseZumba::class, 'area_id', 'area_id');
+    }
 }

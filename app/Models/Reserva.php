@@ -12,6 +12,7 @@ class Reserva extends Model
 {
     use HasFactory;
 
+    protected $table = 'reservas';
     protected $primaryKey = 'reserva_id';
 
 
@@ -32,9 +33,12 @@ class Reserva extends Model
      * Ajusta los casts para que coincidan con las columnas en $fillable y sus tipos de datos.
      */
     protected $casts = [
+        'cliente_id' => 'integer',
+        'cancha_id' => 'integer',
         'fecha' => 'date:Y-m-d',
         'monto' => 'decimal:2',
         'pago_completo' => 'boolean',
+
 
     ];
 
@@ -55,28 +59,19 @@ class Reserva extends Model
     }
 
 
-    // --- Opcional: Accessors para obtener fecha y hora combinadas ---
-    // Si necesitas trabajar frecuentemente con la fecha y hora combinadas como un objeto DateTime/Carbon,
-    // puedes definir accessors. Esto NO cambia tu base de datos, solo cómo accedes a la información.
-
-    /*
-    protected function fechaHoraInicio(): Attribute
+    public function encuestas()
     {
-        return Attribute::make(
-            get: fn ($value, $attributes) => isset($attributes['fecha']) && isset($attributes['hora_inicio'])
-                ? Carbon::parse($attributes['fecha'] . ' ' . $attributes['hora_inicio'])
-                : null,
-        );
+        return $this->hasMany(Encuesta::class, 'reserva_id', 'reserva_id');
     }
 
-    protected function fechaHoraFin(): Attribute
+    public function puntosLogs()
     {
-        return Attribute::make(
-            get: fn ($value, $attributes) => isset($attributes['fecha']) && isset($attributes['hora_fin'])
-                ? Carbon::parse($attributes['fecha'] . ' ' . $attributes['hora_fin'])
-                : null,
-        );
+        return $this->hasMany(PuntosLog::class, 'reserva_id', 'reserva_id');
     }
-    */
+
+    public function canjesPremios() // Canjes aplicados a esta reserva (ej. descuento)
+    {
+        return $this->hasMany(CanjePremio::class, 'reserva_id', 'reserva_id');
+    }
 
 }

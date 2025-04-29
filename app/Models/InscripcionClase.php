@@ -9,18 +9,24 @@ class InscripcionClase extends Model
 {
     use HasFactory;
 
+    protected $table = 'inscripciones_clase'; // Nombre de la tabla en la base de datos
     protected $primaryKey = 'inscripcion_id';
     protected $fillable = [
         'clase_id',
         'cliente_id',
-        'reserva_id',
-        'fecha_inscripcion',
-        'asistio',
+        'fecha_inscripcion', // Ajustado a SQL
+        'estado', // Ajustado a SQL
+        'monto_pagado', // Ajustado a SQL
+        'metodo_pago', // Ajustado a SQL
+        'fecha_pago', // Ajustado a SQL
     ];
 
     protected $casts = [
+        'clase_id' => 'integer',
+        'cliente_id' => 'integer',
         'fecha_inscripcion' => 'datetime',
-        'asistio' => 'boolean',
+        'monto_pagado' => 'decimal:2',
+        'fecha_pago' => 'datetime',
     ];
 
     public function clase()
@@ -33,10 +39,18 @@ class InscripcionClase extends Model
         return $this->belongsTo(Cliente::class, 'cliente_id', 'cliente_id');
     }
 
-    public function reserva()
+    public function encuestas()
     {
-        return $this->belongsTo(Reserva::class, 'reserva_id', 'reserva_id');
+        return $this->hasMany(Encuesta::class, 'inscripcion_clase_id', 'inscripcion_id');
     }
 
-    // Puedes agregar aquí las relaciones con otras tablas si las hubiera
+    public function puntosLogs()
+    {
+        return $this->hasMany(PuntosLog::class, 'inscripcion_clase_id', 'inscripcion_id');
+    }
+
+    public function canjesPremios() // Canjes aplicados a esta inscripción (ej. descuento)
+    {
+        return $this->hasMany(CanjePremio::class, 'inscripcion_clase_id', 'inscripcion_id');
+    }
 }

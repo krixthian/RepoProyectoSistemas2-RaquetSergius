@@ -16,6 +16,7 @@ return new class extends Migration {
             $table->integer('capacidad');
             $table->boolean('disponible')->default(true);
             $table->decimal('precio_clase', 10, 2);
+            $table->binary('img_horario')->nullable(); // image -> binary() es la opción más cercana en Laravel
             $table->timestamps();
         });
     }

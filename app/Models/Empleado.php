@@ -7,10 +7,10 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 class Empleado extends Authenticatable
 {
     use HasFactory;
-    
+
     protected $table = 'empleados';
     protected $primaryKey = 'empleado_id';
-    
+
     protected $fillable = [
         'nombre',
         'usuario',
@@ -20,11 +20,14 @@ class Empleado extends Authenticatable
         'email',
         'activo',
     ];
-    
+
     protected $hidden = [
         'contrasena',
         'remember_token',
     ];
-    
-    // Puedes agregar aquí las relaciones con otras tablas si las hubiera
+
+    public function getAuthPassword()
+    {
+        return $this->contrasena;
+    }
 }

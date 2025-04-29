@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Cancha extends Model
 {
     use HasFactory;
-
+    protected $table = 'canchas';
     protected $primaryKey = 'cancha_id';
     protected $fillable = [
         'nombre',
@@ -24,5 +24,8 @@ class Cancha extends Model
         'capacidad' => 'integer',
     ];
 
-    // Puedes agregar aquí las relaciones con otras tablas si las hubiera
+    public function reservas()
+    {
+        return $this->hasMany(Reserva::class, 'cancha_id', 'cancha_id');
+    }
 }
