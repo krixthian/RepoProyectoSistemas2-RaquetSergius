@@ -14,9 +14,9 @@ Es un sistema de gestión integral para raquet-sergius para los modulos de reser
 | **Rol**     | **Nombre**        | **Responsabilidad**                                                                 |
 |-------------|-------------------|-------------------------------------------------------------------------------------|
 | Programador | todos             | Cada uno evalúa sus respectivas historias de usuario y programa su gestión respectiva. |
-| Tester      | xxxxxxxxxxxx     | Encargado de verificar la funcionalidad correcta de las reservas y otras tareas del equipo, asegurando que todo funcione correctamente. |
-| Tracker     | xxxxxxxxxx       | Supervisar al equipo, asegurándose de que cada tarea sea entregada a tiempo y enviada al Tester de manera correspondiente. |
-| Coach       | xxxxxxxxxxx      | Guía al equipo con la programación XP y tiene el primer contacto cercano con el cliente. |
+| Tester      | todos     | Encargado de verificar la funcionalidad correcta de las reservas y otras tareas del equipo, asegurando que todo funcione correctamente. |
+| Tracker     | andres  baldiviezo     | Supervisar al equipo, asegurándose de que cada tarea sea entregada a tiempo y enviada al Tester de manera correspondiente. |
+| Coach       | andres baldiviezo      | Guía al equipo con la programación XP y tiene el primer contacto cercano con el cliente. |
 
 # Normas del Equipo
 

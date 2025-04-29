@@ -9,6 +9,7 @@ class Torneo extends Model
 {
     use HasFactory;
 
+    protected $table = 'torneos';
     protected $primaryKey = 'torneo_id';
     protected $fillable = [
         'evento_id',
@@ -17,11 +18,17 @@ class Torneo extends Model
         'estado',
         'deporte',
     ];
-
+    protected $casts = [
+        'evento_id' => 'integer',
+        'num_equipos' => 'integer',
+    ];
     public function evento()
     {
         return $this->belongsTo(Evento::class, 'evento_id', 'evento_id');
     }
 
-    // Puedes agregar aquí las relaciones con otras tablas si las hubiera
+    public function equipos()
+    {
+        return $this->hasMany(Equipo::class, 'torneo_id', 'torneo_id');
+    }
 }

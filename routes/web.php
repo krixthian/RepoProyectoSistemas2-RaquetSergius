@@ -5,7 +5,9 @@ use Illuminate\Http\Request;
 use App\Models\Empleado; // Asumiendo que este modelo existe y es autenticable
 use Illuminate\Support\Facades\Hash;
 use App\Http\Controllers\DashboardController;
+
 use App\Http\Controllers\WhatsappController; // Asumiendo que existe
+
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\ReservaController; // <-- Importar el controlador de Reservas

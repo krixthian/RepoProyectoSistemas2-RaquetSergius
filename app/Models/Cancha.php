@@ -14,6 +14,7 @@ class Cancha extends Model
     protected $primaryKey = 'cancha_id';
     // ... (fillable, casts, etc. como los tenías) ...
 
+
     /**
      * Relación: Una Cancha puede estar en muchas Reservas (via tabla pivote).
      * (Corregida)
@@ -27,5 +28,12 @@ class Cancha extends Model
                        'reserva_id')        // Clave foránea en pivote para modelo relacionado (Reserva)
                     ->withPivot('precio_total', 'reserva_cancha_id') // Campos extra en pivote
                     ->withTimestamps();      // Pivote tiene timestamps
-    }
+
+    protected $casts = [
+        'disponible' => 'boolean',
+        'precio_hora' => 'decimal:2',
+        'capacidad' => 'integer',
+    ];
+
+
 }

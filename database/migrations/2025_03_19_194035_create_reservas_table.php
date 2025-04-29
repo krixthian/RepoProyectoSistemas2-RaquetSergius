@@ -21,9 +21,9 @@ return new class extends Migration {
             $table->string('estado'); // "pendiente/confirmada/cancelada"
             $table->string('metodo_pago'); // "QR/efectivo"
             $table->boolean('pago_completo')->default(false);
- 
+
             $table->timestamps();
- 
+
             $table->foreign('cancha_id')->references('cancha_id')->on('canchas');
             $table->foreign('cliente_id')->references('cliente_id')->on('clientes');
         });

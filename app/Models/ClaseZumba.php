@@ -9,23 +9,27 @@ class ClaseZumba extends Model
 {
     use HasFactory;
 
+    protected $table = 'clases_zumba'; // Ajustado a SQL
     protected $primaryKey = 'clase_id';
     protected $fillable = [
         'area_id',
         'instructor_id',
-        'fecha_hora_inicio',
-        'fecha_hora_fin',
-        'cupo_maximo',
-        'cupo_actual',
-        'precio',
+        'diasemama', // Ajustado a SQL
+        'hora_inicio', // Ajustado a SQL
+        'hora_fin', // Ajustado a SQL
+        'precio', // Ajustado a SQL
+        'cupo_maximo', // Ajustado a SQL
+        'habilitado', // Ajustado a SQL
+
     ];
 
     protected $casts = [
-        'fecha_hora_inicio' => 'datetime',
-        'fecha_hora_fin' => 'datetime',
+        'area_id' => 'integer',
+        'instructor_id' => 'integer',
+        // No hay cast directo para 'time'
         'precio' => 'decimal:2',
         'cupo_maximo' => 'integer',
-        'cupo_actual' => 'integer',
+        'habilitado' => 'boolean',
     ];
 
     public function area()
@@ -38,5 +42,14 @@ class ClaseZumba extends Model
         return $this->belongsTo(Instructor::class, 'instructor_id', 'instructor_id');
     }
 
-    // Puedes agregar aquí las relaciones con otras tablas si las hubiera
+    // Relaciones
+    public function inscripciones()
+    {
+        return $this->hasMany(InscripcionClase::class, 'clase_id', 'clase_id');
+    }
+
+    public function premiosDondeEsGratis() // Premios que regalan esta clase
+    {
+        return $this->hasMany(Premio::class, 'clase_gratis_id', 'clase_id');
+    }
 }

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Instructor extends Model
 {
     use HasFactory;
-
+    protected $table = 'instructores';
     protected $primaryKey = 'instructor_id';
     protected $fillable = [
         'nombre',
@@ -21,5 +21,8 @@ class Instructor extends Model
         'tarifa_hora' => 'decimal:2',
     ];
 
-    // Puedes agregar aquí las relaciones con otras tablas si las hubiera
+    public function clases()
+    {
+        return $this->hasMany(ClaseZumba::class, 'instructor_id', 'instructor_id');
+    }
 }
