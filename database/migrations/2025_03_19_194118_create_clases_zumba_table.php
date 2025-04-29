@@ -21,7 +21,9 @@ return new class extends Migration {
             $table->integer('cupo_maximo'); // int NOT NULL
             $table->boolean('habilitado')->nullable(); // boolean
 
-            $table->timestamps();
+            $table->timestamp('created_at')->default(DB::raw('CURRENT_TIMESTAMP'));
+            $table->timestamp('updated_at')->default(DB::raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+
 
             $table->foreign('area_id')->references('area_id')->on('areas_zumba');
             $table->foreign('instructor_id')->references('instructor_id')->on('instructores');

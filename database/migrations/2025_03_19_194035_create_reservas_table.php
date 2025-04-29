@@ -1,9 +1,9 @@
 <?php
- 
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
- 
+
 return new class extends Migration {
     /**
      * Run the migrations.
@@ -22,13 +22,15 @@ return new class extends Migration {
             $table->string('metodo_pago'); // "QR/efectivo"
             $table->boolean('pago_completo')->default(false);
 
-            $table->timestamps();
+            $table->timestamp('created_at')->default(DB::raw('CURRENT_TIMESTAMP'));
+            $table->timestamp('updated_at')->default(DB::raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+
 
             $table->foreign('cancha_id')->references('cancha_id')->on('canchas');
             $table->foreign('cliente_id')->references('cliente_id')->on('clientes');
         });
     }
- 
+
     /**
      * Reverse the migrations.
      */
