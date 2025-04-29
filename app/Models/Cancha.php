@@ -22,13 +22,15 @@ class Cancha extends Model
     public function reservas(): BelongsToMany
     {
         // --- CORRECCIÓN ---
-        return $this->belongsToMany(Reserva::class,
-                       'reservas_canchas', // Nombre correcto de la tabla pivote
-                       'cancha_id',        // Clave foránea en pivote para este modelo (Cancha)
-                       'reserva_id')        // Clave foránea en pivote para modelo relacionado (Reserva)
-                    ->withPivot('precio_total', 'reserva_cancha_id') // Campos extra en pivote
-                    ->withTimestamps();      // Pivote tiene timestamps
-
+        return $this->belongsToMany(
+            Reserva::class,
+            'reservas_canchas', // Nombre correcto de la tabla pivote
+            'cancha_id',        // Clave foránea en pivote para este modelo (Cancha)
+            'reserva_id'
+        )        // Clave foránea en pivote para modelo relacionado (Reserva)
+            ->withPivot('precio_total', 'reserva_cancha_id') // Campos extra en pivote
+            ->withTimestamps();      // Pivote tiene timestamps
+    }
     protected $casts = [
         'disponible' => 'boolean',
         'precio_hora' => 'decimal:2',
