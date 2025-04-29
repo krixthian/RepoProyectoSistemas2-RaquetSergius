@@ -11,14 +11,16 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('clases_zumba', function (Blueprint $table) {
-            $table->id('clase_id');
-            $table->unsignedBigInteger('area_id');
-            $table->unsignedBigInteger('instructor_id');
-            $table->dateTime('fecha_hora_inicio');
-            $table->dateTime('fecha_hora_fin');
-            $table->integer('cupo_maximo');
-            $table->integer('cupo_actual')->default(0);
-            $table->decimal('precio', 10, 2);
+            $table->id('clase_id'); // int PRIMARY KEY AUTO_INCREMENT
+            $table->unsignedBigInteger('area_id'); // int NOT NULL
+            $table->unsignedBigInteger('instructor_id'); // int NOT NULL
+            $table->string('diasemama', 10)->nullable(); // varchar(10) - ¿Quizás 'dia_semana'?
+            $table->time('hora_inicio'); // time NOT NULL
+            $table->time('hora_fin'); // time NOT NULL
+            $table->decimal('precio', 8, 2); // decimal(8,2) NOT NULL
+            $table->integer('cupo_maximo'); // int NOT NULL
+            $table->boolean('habilitado')->nullable(); // boolean
+
             $table->timestamps();
 
             $table->foreign('area_id')->references('area_id')->on('areas_zumba');

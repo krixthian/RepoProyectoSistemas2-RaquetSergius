@@ -9,6 +9,7 @@ class Notificacion extends Model
 {
     use HasFactory;
 
+    protected $table = 'notificaciones';
     protected $primaryKey = 'notificacion_id';
     protected $fillable = [
         'cliente_id',
@@ -19,6 +20,7 @@ class Notificacion extends Model
     ];
 
     protected $casts = [
+        'cliente_id' => 'integer',
         'fecha_envio' => 'datetime',
         'enviada' => 'boolean',
     ];

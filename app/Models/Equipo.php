@@ -9,6 +9,7 @@ class Equipo extends Model
 {
     use HasFactory;
 
+    protected $table = 'equipos';
     protected $primaryKey = 'equipo_id';
     protected $fillable = [
         'nombre',
@@ -16,6 +17,10 @@ class Equipo extends Model
         'capitan_id',
     ];
 
+    protected $casts = [
+        'torneo_id' => 'integer',
+        'capitan_id' => 'integer',
+    ];
     public function torneo()
     {
         return $this->belongsTo(Torneo::class, 'torneo_id', 'torneo_id');
