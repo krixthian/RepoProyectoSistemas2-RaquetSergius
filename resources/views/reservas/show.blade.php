@@ -3,45 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <title>Detalle Reserva #{{ $reserva->reserva_id }}</title>
-     <style> /* Estilos básicos */ body { font-family: sans-serif; margin: 20px; } .detail-section { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #eee;} h3 { margin-top: 0;} ul { list-style: none; padding: 0;} li { margin-bottom: 8px;} strong { display: inline-block; width: 150px; } </style>
+    <style>
+        body { font-family:sans-serif; margin:20px; background:#2C3844; color:white; }
+        h1 { color:#59FFD8; }
+        .detail { margin-bottom:20px; padding-bottom:15px; border-bottom:1px solid #ADBCB9; }
+        h3 { margin-top:0; color:#59FFD8; }
+        ul { list-style:none; padding:0; }
+        li { margin-bottom:8px; }
+        strong { display:inline-block; width:160px; color:#ADBCB9; }
+        a { display:inline-block; padding:8px 12px; background:#59FFD8; color:#2C3844; text-decoration:none; border-radius:4px; margin-top:10px; }
+        a:hover { background:#ADBCB9; }
+    </style>
 </head>
 <body>
     <h1>Detalle Reserva #{{ $reserva->reserva_id }}</h1>
 
-    <div class="detail-section">
+    <div class="detail">
         <h3>Datos Generales</h3>
         <ul>
-            <li><strong>Cliente:</strong> {{ $reserva->cliente ? $reserva->cliente->nombre : 'N/A' }}</li>
-            <li><strong>Inicio:</strong> {{ $reserva->fecha_hora_inicio->format('d/m/Y H:i') }}</li>
-            <li><strong>Fin:</strong> {{ $reserva->fecha_hora_fin->format('d/m/Y H:i') }}</li>
-            <li><strong>Monto Total:</strong> {{ number_format($reserva->monto, 2) }}</li>
+            <li><strong>Cliente:</strong> {{ $reserva->cliente->nombre ?? '–' }}</li>
+            <li><strong>Cancha:</strong> {{ $reserva->cancha->nombre ?? '–' }}</li>
+            <li>
+                <strong>Inicio:</strong>
+                {{ optional($reserva->fecha)->format('d/m/Y') ?? '–' }}
+                {{ $reserva->hora_inicio }}
+            </li>
+            <li>
+                <strong>Fin:</strong>
+                {{ optional($reserva->fecha)->format('d/m/Y') ?? '–' }}
+                {{ $reserva->hora_fin }}
+            </li>
+            <li><strong>Monto Total:</strong> {{ number_format($reserva->monto,2) }}</li>
             <li><strong>Estado:</strong> {{ $reserva->estado }}</li>
-            <li><strong>Método Pago:</strong> {{ $reserva->metodo_pago ?? '-' }}</li>
+            <li><strong>Método Pago:</strong> {{ $reserva->metodo_pago ?? '–' }}</li>
             <li><strong>Pago Completo:</strong> {{ $reserva->pago_completo ? 'Sí' : 'No' }}</li>
-            <li><strong>Creado:</strong> {{ $reserva->created_at->format('d/m/Y H:i') }}</li>
-            <li><strong>Actualizado:</strong> {{ $reserva->updated_at->format('d/m/Y H:i') }}</li>
+            <li>
+                <strong>Creado:</strong>
+                {{ optional($reserva->created_at)->format('d/m/Y H:i') ?? '–' }}
+            </li>
+            <li>
+                <strong>Actualizado:</strong>
+                {{ optional($reserva->updated_at)->format('d/m/Y H:i') ?? '–' }}
+            </li>
         </ul>
     </div>
 
-     <div class="detail-section">
-        <h3>Cancha(s) Asignada(s)</h3>
-        @if ($reserva->canchas->isNotEmpty())
-            <ul>
-                @foreach ($reserva->canchas as $cancha)
-                    <li>
-                       <strong>{{ $cancha->nombre ?? 'N/A' }}:</strong>
-                       Precio específico: {{ number_format($cancha->pivot->precio_total, 2) }}
-                       <small>(ID Asignación: {{ $cancha->pivot->reserva_cancha_id }})</small>
-                    </li>
-                @endforeach
-            </ul>
-        @else
-            <p>No hay canchas asignadas específicamente a esta reserva.</p>
-        @endif
-    </div>
-
     <a href="{{ route('reservas.index') }}">Volver al listado</a>
-    {{-- <a href="{{ route('reservas.edit', $reserva->reserva_id) }}" style="margin-left: 15px;">Editar Reserva</a> --}}
-
 </body>
 </html>

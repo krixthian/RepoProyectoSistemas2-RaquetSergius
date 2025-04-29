@@ -9,13 +9,14 @@ class Reserva extends Model
 {
     use HasFactory;
 
-    protected $table = 'reservas';
     protected $primaryKey = 'reserva_id';
 
     protected $fillable = [
+        'cancha_id',
         'cliente_id',
-        'fecha_hora_inicio',
-        'fecha_hora_fin',
+        'fecha',
+        'hora_inicio',
+        'hora_fin',
         'monto',
         'estado',
         'metodo_pago',
@@ -23,30 +24,23 @@ class Reserva extends Model
     ];
 
     /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
+     * Convierte automáticamente estos campos a instancias de Carbon (o tipos nativos).
      */
-    // --- AÑADIR O MODIFICAR ESTA SECCIÓN ---
     protected $casts = [
-        'fecha_hora_inicio' => 'datetime', // Convierte a objeto Carbon
-        'fecha_hora_fin' => 'datetime',    // Convierte a objeto Carbon
-        'pago_completo' => 'boolean',      // Es bueno mantener esto también
-        'monto' => 'decimal:2',          // Si 'monto' es decimal/float, también es bueno castearlo
+        'fecha'         => 'date',       // ahora $reserva->fecha es Carbon
+        'monto'         => 'decimal:2',
+        'pago_completo' => 'boolean',
+        'created_at'    => 'datetime',   // ya vienen así por defecto, pero lo ponemos explícito
+        'updated_at'    => 'datetime',
     ];
-    // ----------------------------------------
 
-
-    // --- Relaciones (como las tenías antes) ---
     public function cliente()
     {
         return $this->belongsTo(Cliente::class, 'cliente_id', 'cliente_id');
     }
 
-    public function canchas()
+    public function cancha()
     {
-        return $this->belongsToMany(Cancha::class, 'reservas_canchas', 'reserva_id', 'cancha_id')
-                    ->withPivot('precio_total', 'reserva_cancha_id')
-                    ->withTimestamps();
+        return $this->belongsTo(Cancha::class, 'cancha_id', 'cancha_id');
     }
 }

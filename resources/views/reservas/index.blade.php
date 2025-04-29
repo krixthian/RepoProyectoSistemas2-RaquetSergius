@@ -3,69 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <title>Listado de Reservas</title>
-    <style> /* Estilos básicos */ body { font-family: sans-serif; margin: 20px; } table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.9em;} th, td { border: 1px solid #ddd; padding: 6px; text-align: left; vertical-align: top;} th { background-color: #f2f2f2; white-space: nowrap;} .alert { padding: 10px; margin-bottom: 15px; border-radius: 4px; } .alert-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; } .button-link { display: inline-block; padding: 8px 12px; background-color: #28a745; color: white; text-decoration: none; border-radius: 4px; font-size:0.9em; } ul { margin: 0; padding-left: 18px; list-style: disc;} .actions a {margin-right: 5px; text-decoration: none;} </style>
+    <style>
+        body { font-family: sans-serif; margin:20px; background:#2C3844; color:white; }
+        h1 { color:#59FFD8; }
+        .alert { padding:10px; margin-bottom:15px; border-radius:4px; }
+        .alert-success { background:#59FFD8; color:#2C3844; border:1px solid #ADBCB9; }
+        .alert-danger  { background:#f2dede; color:#a94442; border:1px solid #ebccd1; }
+        .button-link {
+            display:inline-block; padding:10px 15px; background:#59FFD8;
+            color:#2C3844; border-radius:4px; text-decoration:none; font-weight:bold;
+        }
+        .button-link:hover { background:#ADBCB9; }
+        table {
+            width:100%; border-collapse:collapse; margin-top:15px; font-size:.9em;
+        }
+        th, td {
+            border:1px solid #ADBCB9; padding:6px; vertical-align:top;
+        }
+        th { background:#59FFD8; color:#2C3844; white-space:nowrap; }
+        td { background:#2C3844; }
+        .actions a {
+            margin-right:8px; color:#59FFD8; text-decoration:none;
+        }
+        .actions a:hover { color:#ADBCB9; }
+    </style>
 </head>
 <body>
     <h1>Listado de Reservas</h1>
 
     @if (session('success'))
-        <div class="alert alert-success">
-            {{ session('success') }}
-        </div>
+        <div class="alert alert-success">{{ session('success') }}</div>
     @endif
 
-    <p>
-        <a href="{{ route('reservas.create') }}" class="button-link">Crear Nueva Reserva</a>
-    </p>
+    @if ($errors->has('error_general'))
+        <div class="alert alert-danger">{{ $errors->first('error_general') }}</div>
+    @endif
+
+    <a href="{{ route('reservas.create') }}" class="button-link">Crear Nueva Reserva</a>
 
     <table>
         <thead>
             <tr>
                 <th>ID</th>
                 <th>Cliente</th>
+                <th>Cancha</th>
                 <th>Inicio</th>
                 <th>Fin</th>
-                <th>Monto Total</th>
+                <th>Monto</th>
                 <th>Estado</th>
                 <th>Pago Completo</th>
                 <th>Método Pago</th>
-                <th>Canchas (Precio Específico)</th>
                 <th>Creado</th>
                 <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
-            @forelse ($reservas as $reserva)
+            @forelse ($reservas as $res)
                 <tr>
-                    <td>{{ $reserva->reserva_id }}</td>
-                    {{-- Accede al nombre del cliente a través de la relación --}}
-                    <td>{{ $reserva->cliente ? $reserva->cliente->nombre : 'Cliente no encontrado' }}</td>
-                    <td>{{ $reserva->fecha_hora_inicio->format('d/m/Y H:i') }}</td>
-                    <td>{{ $reserva->fecha_hora_fin->format('d/m/Y H:i') }}</td>
-                    <td>{{ number_format($reserva->monto, 2) }}</td>
-                    <td>{{ $reserva->estado }}</td>
-                    <td>{{ $reserva->pago_completo ? 'Sí' : 'No' }}</td>
-                    <td>{{ $reserva->metodo_pago ?? '-' }}</td>
-                    <td>
-                        {{-- Accede a las canchas y su precio_total desde la tabla pivote --}}
-                        @if ($reserva->canchas->isNotEmpty())
-                            <ul>
-                            @foreach ($reserva->canchas as $cancha)
-                                <li>
-                                    {{ $cancha->nombre ?? 'Cancha no encontrada' }}
-                                    ({{ number_format($cancha->pivot->precio_total, 2) }})
-                                </li>
-                            @endforeach
-                            </ul>
-                        @else
-                            -
-                        @endif
-                    </td>
-                    <td>{{ $reserva->created_at->format('d/m/Y H:i') }}</td>
+                    <td>{{ $res->reserva_id }}</td>
+                    <td>{{ $res->cliente->nombre ?? '–' }}</td>
+                    <td>{{ $res->cancha->nombre ?? '–' }}</td>
+                    <td>{{ $res->fecha->format('d/m/Y') }} {{ $res->hora_inicio }}</td>
+                    <td>{{ $res->fecha->format('d/m/Y') }} {{ $res->hora_fin }}</td>
+                    <td>{{ number_format($res->monto,2) }}</td>
+                    <td>{{ $res->estado }}</td>
+                    <td>{{ $res->pago_completo ? 'Sí' : 'No' }}</td>
+                    <td>{{ $res->metodo_pago ?? '–' }}</td>
+                    <td>{{ $res->created_at->format('d/m/Y H:i') }}</td>
                     <td class="actions">
-                        <a href="{{ route('reservas.show', $reserva->reserva_id) }}">Ver</a>
-                        {{-- <a href="{{ route('reservas.edit', $reserva->reserva_id) }}">Editar</a> --}}
-                        {{-- Formulario DELETE si implementas destroy --}}
+                        <a href="{{ route('reservas.show', $res->reserva_id) }}">Ver</a>
+                        <a href="{{ route('reservas.edit', $res->reserva_id) }}">Editar</a>
                     </td>
                 </tr>
             @empty
