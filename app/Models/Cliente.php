@@ -4,14 +4,19 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany; // Importar
 
 class Cliente extends Model
 {
     use HasFactory;
 
-    protected $table = 'clientes';
-    protected $primaryKey = 'cliente_id';
+
+    protected $table = 'clientes'; // Asumiendo que la tabla se llama así
+    protected $primaryKey = 'cliente_id'; // Clave primaria correcta
+    public $incrementing = true; // Asegúrate si es autoincremental
+    protected $keyType = 'int';
     public $timestamps = false;
+
     protected $fillable = [
         'nombre',
         'telefono',
@@ -38,6 +43,8 @@ class Cliente extends Model
         'streak_semanal_maxima' => 'integer',
         'ultima_semana_actividad' => 'integer',
     ];
+
+
 
     public function reservas()
     {
@@ -73,4 +80,5 @@ class Cliente extends Model
     {
         return $this->hasMany(CanjePremio::class, 'cliente_id', 'cliente_id');
     }
+
 }

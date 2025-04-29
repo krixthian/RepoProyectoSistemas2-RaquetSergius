@@ -28,18 +28,13 @@ class Reserva extends Model
         'pago_completo',
     ];
 
-    /**
-     * The attributes that should be cast.
-     * Ajusta los casts para que coincidan con las columnas en $fillable y sus tipos de datos.
-     */
+
     protected $casts = [
         'cliente_id' => 'integer',
         'cancha_id' => 'integer',
         'fecha' => 'date:Y-m-d',
         'monto' => 'decimal:2',
         'pago_completo' => 'boolean',
-
-
     ];
 
     /**
@@ -59,6 +54,7 @@ class Reserva extends Model
     }
 
 
+
     public function encuestas()
     {
         return $this->hasMany(Encuesta::class, 'reserva_id', 'reserva_id');
@@ -75,3 +71,4 @@ class Reserva extends Model
     }
 
 }
+
