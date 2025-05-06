@@ -58,24 +58,16 @@ class whatsappController extends Controller
      * los nombres de los intents deben coincidir con los definidos en Dialogflow.
      */
     private $intentHandlerMap = [
-        //RESERVAS CANCHAS WALLY
+        //MAPEO RESERVAS
         'Consulta Disponibilidad Cancha' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaDisponibilidadCanchaHandler::class,
         'Realizar Reserva Cancha' => \App\Http\Controllers\Chatbot\IntentHandlers\RealizarReservaCanchaHandler::class,
         'cancelar reserva' => \App\Http\Controllers\Chatbot\IntentHandlers\CancelarReservaHandler::class,
         'Consulta Reserva' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaReservaHandler::class,
-        //INSCRIPCIONES CLASES ZUMBA 
-        'Consulta Horarios Zumba' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaHorariosZumbaHandler::class,
-        // 'Inscripción Clase Zumba' => InscripcionClaseZumbaHandler::class,
-        // 'Eventos Zumba'           => EventosZumbaHandler::class,
 
-
-        //'Información e inscripcion Torneos' => \App\Http\Controllers\Chatbot\IntentHandlers\InformacionTorneosHandler::class,
-
-        //OTROS
-        // 'Ayuda / Información General' => AyudaHandler::class,
-        // 'Contacto Empleado'       => ContactoEmpleadoHandler::class,
-        // 'Saludo' => \App\Chatbot\IntentHandlers\SaludoHandler::class, // Ejemplo si es complicado
-        // 'Despedida' => \App\Chatbot\IntentHandlers\DespedidaHandler::class, // Ejemplo si es complicado
+        //MAPEO ZUMBA
+        'Consulta Horarios Zumba' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaHorariosZumbaHandler::class, // Tu handler modificado
+        'Inscripcion Clase Zumba' => \App\Http\Controllers\Chatbot\IntentHandlers\InscripcionClaseZumbaHandler::class,
+        // ... otros handlers
     ];
 
     /**
@@ -114,28 +106,52 @@ class whatsappController extends Controller
                         $dialogflowResponse = $this->processDialogflowViaHttp($messageText, $senderPhone);
 
                         // *** Verificar tipo de respuesta y enviar mensaje ***
+                        // *** MODIFICACIÓN: Verificar tipo de respuesta y enviar ***
                         if ($dialogflowResponse) {
                             if (is_string($dialogflowResponse)) {
                                 // Respuesta de texto normal
                                 $this->sendWhatsAppMessage($senderPhone, $dialogflowResponse);
-                            } elseif (is_array($dialogflowResponse) && isset($dialogflowResponse['type']) && $dialogflowResponse['type'] === 'location') {
-                                // Respuesta de ubicación
-                                $this->sendWhatsAppLocation(
-                                    $senderPhone,
-                                    $dialogflowResponse['latitude'],
-                                    $dialogflowResponse['longitude'],
-                                    $dialogflowResponse['name'],
-                                    $dialogflowResponse['address']
-                                );
+                            } elseif (is_array($dialogflowResponse) && isset($dialogflowResponse['type'])) {
+                                switch ($dialogflowResponse['type']) {
+                                    case 'location':
+                                        // Respuesta de ubicación (ya la tenías)
+                                        $this->sendWhatsAppLocation(
+                                            $senderPhone,
+                                            $dialogflowResponse['latitude'] ?? 0, // Valor por defecto por si acaso
+                                            $dialogflowResponse['longitude'] ?? 0,
+                                            $dialogflowResponse['name'] ?? '',
+                                            $dialogflowResponse['address'] ?? ''
+                                        );
+                                        break;
+                                    case 'image':
+                                        // NUEVO: Respuesta de imagen
+                                        // Asegúrate que las claves 'url' (o 'id') y 'caption' existan
+                                        if (isset($dialogflowResponse['url']) && isset($dialogflowResponse['caption'])) {
+                                            $this->sendWhatsAppImage(
+                                                $senderPhone,
+                                                $dialogflowResponse['url'],
+                                                $dialogflowResponse['caption']
+                                            );
+                                        } else {
+                                            Log::error("Invalid image structure from handler: " . json_encode($dialogflowResponse));
+                                            $this->sendWhatsAppMessage($senderPhone, "Hubo un error al preparar la imagen de horarios.");
+                                        }
+                                        break;
+                                    default:
+                                        // Tipo de respuesta no esperado
+                                        Log::error("Unexpected response type from handler: " . json_encode($dialogflowResponse));
+                                        $this->sendWhatsAppMessage($senderPhone, "Hubo un error inesperado al procesar tu solicitud.");
+                                }
                             } else {
-                                // Tipo de respuesta no esperado
-                                Log::error("Unexpected response type from Dialogflow processing: " . json_encode($dialogflowResponse));
-                                $this->sendWhatsAppMessage($senderPhone, "Hubo un error inesperado al procesar tu solicitud.");
+                                // Tipo de respuesta no string ni array esperado
+                                Log::error("Unexpected response format from Dialogflow processing: " . gettype($dialogflowResponse));
+                                $this->sendWhatsAppMessage($senderPhone, "Hubo un error interno al procesar tu solicitud.");
                             }
                         } else {
                             Log::error("No response received from Dialogflow HTTP processing for message: {$messageText}");
-                            // $this->sendWhatsAppMessage($senderPhone, "Lo siento, no pude procesar tu solicitud en este momento.");
+                            // $this->sendWhatsAppMessage($senderPhone, "Lo siento, no pude procesar tu solicitud en este momento."); // Comentado para evitar respuestas si falla DF
                         }
+                        // *** FIN MODIFICACIÓN ***
                         // *** Fin Verificación y envío ***
 
                     } else {
@@ -393,6 +409,64 @@ class whatsappController extends Controller
         }
     }
 
+    /**
+     * Envía un mensaje de imagen usando una URL pública.
+     * @param string $recipient Número de teléfono.
+     * @param string $imageUrl URL pública de la imagen (HTTPS recomendado).
+     * @param string $caption Texto que acompaña a la imagen (opcional).
+     * @return bool Éxito o fallo.
+     */
+    private function sendWhatsAppImage(string $recipient, string $imageUrl, string $caption = ''): bool
+    {
+        if (empty($this->wsToken) || empty($this->whatsappBusinessId)) {
+            Log::error('WhatsApp credentials (token or business ID) not configured for sending image.');
+            return false;
+        }
+        if (filter_var($imageUrl, FILTER_VALIDATE_URL) === FALSE) {
+            Log::error("Invalid image URL provided: {$imageUrl}");
+            return false;
+        }
+
+        try {
+            $url = "https://graph.facebook.com/v22.0/{$this->whatsappBusinessId}/messages"; // Usa la versión de API que necesites
+
+            $payload = [
+                'messaging_product' => 'whatsapp',
+                'recipient_type' => 'individual',
+                'to' => $recipient,
+                'type' => 'image',
+                'image' => [
+                    // Usa 'link' para URL directa
+                    'link' => $imageUrl,
+                    // Añade caption si no está vacío
+                    // La API requiere que 'caption' esté presente incluso si está vacío para algunos tipos,
+                    // pero para 'link' es opcional según la doc. Lo añadimos si existe.
+                    // 'caption' => $caption // Descomentar si es necesario incluso vacío
+                ]
+            ];
+            // Añadir caption solo si tiene contenido
+            if (!empty($caption)) {
+                $payload['image']['caption'] = $caption;
+            }
+
+
+            Log::info("Sending WhatsApp IMAGE to {$recipient}. URL: {$imageUrl}, Caption: " . ($caption ?: 'None'));
+            $response = Http::withToken($this->wsToken)->post($url, $payload);
+
+            Log::info('WhatsApp API Response Status (Image): ' . $response->status());
+            Log::debug('WhatsApp API Response Body (Image): ' . $response->body()); // Debug para no llenar logs
+
+            if (!$response->successful()) {
+                Log::error('Error sending WhatsApp IMAGE message: ' . $response->body());
+                // Puedes añadir lógica aquí para intentar subir el medio si falla el link directo
+                return false;
+            }
+            return true;
+        } catch (Exception $e) {
+            Log::error('Exception sending WhatsApp IMAGE message: ' . $e->getMessage());
+            return false;
+        }
+    }
 
 
     /**

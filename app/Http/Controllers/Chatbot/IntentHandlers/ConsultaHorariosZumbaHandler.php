@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Chatbot\IntentHandlers;
 
 use App\Chatbot\IntentHandlerInterface;
 use App\Models\ClaseZumba;
+use App\Models\AreaZumba;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL; // Importa el facade URL para usar asset() de forma explícita si prefieres
 use Carbon\Carbon;
 
 class ConsultaHorariosZumbaHandler implements IntentHandlerInterface
@@ -14,62 +16,75 @@ class ConsultaHorariosZumbaHandler implements IntentHandlerInterface
      *
      * @param array $parameters
      * @param string $senderId
-     * @return string
+     * @return array|string // Compatible con la interfaz modificada
      */
-    public function handle(array $parameters, string $senderId): string
+    public function handle(array $parameters, string $senderId): array|string
     {
         Log::info('Executing ConsultaHorariosZumbaHandler');
         Carbon::setLocale('es');
-        // --- Lógica para consultar horarios ---
-
-        // Por ahora, buscaremos las clases de los próximos 7 días
-        $hoy = Carbon::today();
-        $fechaLimite = Carbon::today()->addDays(7);
 
         try {
-            // Consultar clases futuras, ordenadas por fecha/hora
-            // Eager loading para obtener datos del instructor y área si es necesario
-            $clases = ClaseZumba::where('fecha_hora_inicio', '>=', $hoy)
-                ->where('fecha_hora_inicio', '<', $fechaLimite)
-                ->with(['instructor', 'area']) // Carga relaciones si las necesitas en la respuesta
-                ->orderBy('fecha_hora_inicio', 'asc')
+            // 1. Obtener el Área de Zumba (misma lógica que antes)
+            $areaZumba = AreaZumba::where('disponible', true)->with('clases')->first();
+
+            if (!$areaZumba) {
+                Log::warning('No available Zumba areas found.');
+                return "Lo siento, no encontré áreas de Zumba disponibles en este momento.";
+            }
+
+            // Asegúrate que el campo 'ruta_imagen' NO esté vacío y contenga la RUTA RELATIVA a public/
+            // Ejemplo: 'images/horarios_zumba.jpg'
+            if (empty($areaZumba->ruta_imagen)) {
+                Log::warning("AreaZumba ID {$areaZumba->area_id} does not have ruta_imagen set.");
+                return "No encontré la imagen de horarios configurada. Por favor, contacta a administración.";
+            }
+
+            // *** MODIFICACIÓN: Construir URL pública usando asset() ***
+            // asset() genera la URL completa: https://tu-dominio.com/ + la ruta relativa
+            // Asegúrate que tu APP_URL en .env esté configurada correctamente.
+            $publicImageUrl = asset($areaZumba->ruta_imagen);
+            Log::info("Generated public image URL: " . $publicImageUrl);
+
+
+            // 2. Obtener las clases y construir el caption (misma lógica que antes)
+            $clases = $areaZumba->clases()
+                ->orderBy('diasemama')
+                ->orderBy('hora_inicio')
                 ->get();
 
+            $caption = "Estos son nuestros horarios de Zumba!!!\nNota. Todas las clases son de 1 hora.\n";
+            $horariosNoHabilitados = [];
+
             if ($clases->isEmpty()) {
-                return "Actualmente no tenemos clases de Zumba programadas para los próximos 7 días.";
-            }
-
-            // Formatear la respuesta
-            $responseText = "Estos son los horarios de Zumba para los próximos 7 días:\n\n";
-            $diaActual = null;
-
-            foreach ($clases as $clase) {
-                $fechaInicio = Carbon::parse($clase->fecha_hora_inicio);
-                $fechaFin = Carbon::parse($clase->fecha_hora_fin);
-                $nombreDia = $fechaInicio->isoFormat('dddd D'); // Ej: "Martes 22"
-
-                // Agrupa por día
-                if ($nombreDia !== $diaActual) {
-                    $responseText .= "\n--- {$nombreDia} ---\n";
-                    $diaActual = $nombreDia;
+                $caption .= "\n(Actualmente no hay clases programadas para esta área)";
+            } else {
+                foreach ($clases as $clase) {
+                    if ($clase->habilitado === false || $clase->habilitado === null) {
+                        $dia = $clase->diasemama ?? 'Día no especificado';
+                        $horaInicio = Carbon::parse($clase->hora_inicio)->format('H:i');
+                        $horaFin = Carbon::parse($clase->hora_fin)->format('H:i');
+                        $horariosNoHabilitados[] = "- El horario de {$dia} de {$horaInicio} a {$horaFin}";
+                    }
                 }
-
-                $horaInicioStr = $fechaInicio->format('H:i');
-                $horaFinStr = $fechaFin->format('H:i');
-                $instructorNombre = $clase->instructor ? $clase->instructor->nombre : 'Instructor por confirmar'; // Usa el nombre del instructor si la relación funcionó
-                $areaNombre = $clase->area ? $clase->area->nombre : 'Área no especificada'; // Usa el nombre del área si la relación funcionó
-                // $cupoDisponible = $clase->cupo_maximo - $clase->cupo_actual; // Opcional: Mostrar cupos
-
-                $responseText .= "- {$horaInicioStr} a {$horaFinStr} con {$instructorNombre} (en {$areaNombre})\n";
-                // $responseText .= "   (Cupos disponibles: {$cupoDisponible})\n"; // Opcional
             }
 
-            $responseText .= "\nSi deseas inscribirte en alguna, házmelo saber.";
+            if (!empty($horariosNoHabilitados)) {
+                $caption .= "\n\n*Aviso:* Los siguientes horarios podrían no estar habilitados temporalmente:\n";
+                $caption .= implode("\n", $horariosNoHabilitados);
+            } else {
+                $caption .= "\n\nTodos nuestros horarios están habilitados actualmente.";
+            }
 
-            return $responseText;
+
+            // 3. Retornar la estructura para enviar imagen con la URL pública
+            return [
+                'type' => 'image',
+                'url' => $publicImageUrl, // <--- USA LA URL PÚBLICA GENERADA
+                'caption' => $caption
+            ];
 
         } catch (\Exception $e) {
-            Log::error("Error querying Zumba classes: " . $e->getMessage());
+            Log::error("Error in ConsultaHorariosZumbaHandler: " . $e->getMessage() . "\n" . $e->getTraceAsString());
             return "Lo siento, ocurrió un error al consultar los horarios de Zumba. Por favor, intenta más tarde.";
         }
     }
