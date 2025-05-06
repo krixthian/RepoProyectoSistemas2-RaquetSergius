@@ -6,7 +6,7 @@ use App\Chatbot\IntentHandlerInterface;
 use App\Models\ClaseZumba;
 use App\Models\AreaZumba;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\URL; // Importa el facade URL para usar asset() de forma explícita si prefieres
+use Illuminate\Support\Facades\URL;
 use Carbon\Carbon;
 
 class ConsultaHorariosZumbaHandler implements IntentHandlerInterface
@@ -24,7 +24,6 @@ class ConsultaHorariosZumbaHandler implements IntentHandlerInterface
         Carbon::setLocale('es');
 
         try {
-            // 1. Obtener el Área de Zumba (misma lógica que antes)
             $areaZumba = AreaZumba::where('disponible', true)->with('clases')->first();
 
             if (!$areaZumba) {
@@ -32,21 +31,17 @@ class ConsultaHorariosZumbaHandler implements IntentHandlerInterface
                 return "Lo siento, no encontré áreas de Zumba disponibles en este momento.";
             }
 
-            // Asegúrate que el campo 'ruta_imagen' NO esté vacío y contenga la RUTA RELATIVA a public/
-            // Ejemplo: 'images/horarios_zumba.jpg'
+
             if (empty($areaZumba->ruta_imagen)) {
                 Log::warning("AreaZumba ID {$areaZumba->area_id} does not have ruta_imagen set.");
                 return "No encontré la imagen de horarios configurada. Por favor, contacta a administración.";
             }
 
-            // *** MODIFICACIÓN: Construir URL pública usando asset() ***
-            // asset() genera la URL completa: https://tu-dominio.com/ + la ruta relativa
-            // Asegúrate que tu APP_URL en .env esté configurada correctamente.
+
             $publicImageUrl = asset($areaZumba->ruta_imagen);
             Log::info("Generated public image URL: " . $publicImageUrl);
 
 
-            // 2. Obtener las clases y construir el caption (misma lógica que antes)
             $clases = $areaZumba->clases()
                 ->orderBy('diasemama')
                 ->orderBy('hora_inicio')
@@ -76,10 +71,9 @@ class ConsultaHorariosZumbaHandler implements IntentHandlerInterface
             }
 
 
-            // 3. Retornar la estructura para enviar imagen con la URL pública
             return [
                 'type' => 'image',
-                'url' => $publicImageUrl, // <--- USA LA URL PÚBLICA GENERADA
+                'url' => $publicImageUrl,
                 'caption' => $caption
             ];
 

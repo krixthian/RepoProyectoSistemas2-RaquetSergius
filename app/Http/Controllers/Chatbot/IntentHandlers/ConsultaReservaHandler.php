@@ -47,20 +47,14 @@ class ConsultaReservaHandler implements IntentHandlerInterface
 
         // 3. Validar si se encontró una reserva cancelable
         if ($reservaConsulta === null) {
-            // Razones: No hay reservas futuras, hay más de una, o hubo error en la búsqueda.
-            // El log del servicio debería indicar la razón exacta.
             Log::info("ConsultarReservaHandler: No single future reservation found for client {$clienteId} to cancel.");
-            // Verificar si tiene *alguna* reserva futura para dar un mensaje más específico
             if ($this->reservaService->clienteTieneReservaFutura($clienteId)) {
-                // Si esto es true, significa que findUnicaReservaFutura devolvió null porque había MÁS de una
                 return "Hola {$cliente->nombre}, parece que tienes más de una reserva activa. por favor contacta directamente a recepción indicando cuál deseas consultar.";
             } else {
-                // No tenía ninguna reserva futura
                 return "Hola {$cliente->nombre}, no encontré reservas futuras activas a tu nombre, si estas seguro que hiciste una puedes comunicarte con recepcion o intentar hacerla nuevamente.";
             }
         }
 
-        // --- si llega aqui, se encontró UNA reserva ---
         $fechaReserva = Carbon::parse($reservaConsulta->fecha)->format('d/m/Y');
         $horaInicioReserva = Carbon::parse($reservaConsulta->hora_inicio)->format('H:i');
         $horaFinReserva = Carbon::parse($reservaConsulta->hora_fin)->format('H:i');

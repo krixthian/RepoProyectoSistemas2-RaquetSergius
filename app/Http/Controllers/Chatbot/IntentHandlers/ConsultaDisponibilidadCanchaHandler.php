@@ -34,9 +34,8 @@ class ConsultaDisponibilidadCanchaHandler implements IntentHandlerInterface
     {
         Log::info('Executing ConsultaDisponibilidadCanchaHandler');
 
-        // Obtiene el parámetro 'fecha' de Dialogflow
+
         $fechaParam = $parameters['fecha'] ?? null;
-        // Mensaje por defecto si no se proporciona fecha
         $responseText = "Por favor, indica la fecha para la que quieres consultar la disponibilidad (ej. 'mañana', 'el próximo jueves', '15 de abril').";
 
         // Procesa solo si se recibió el parámetro 'fecha'
@@ -52,35 +51,27 @@ class ConsultaDisponibilidadCanchaHandler implements IntentHandlerInterface
                 // Formato Y-m-d para el servicio/API
                 $fechaParaServicio = $fechaConsulta->toDateString();
 
-                // Verifica que no se consulte por fechas pasadas (permite consultar para hoy)
                 if ($fechaConsulta->isPast() && !$fechaConsulta->isToday()) {
                     return "Lo siento, no puedes consultar disponibilidad para fechas pasadas. Por favor, indica una fecha a partir de hoy.";
                 }
 
-                // Llama al método del servicio para obtener las reservas
                 Log::info("Calling ReservaService->getReservasConfirmadasPorFecha directly for " . $fechaParaServicio);
                 $reservasDelDia = $this->reservaService->getReservasConfirmadasPorFecha($fechaParaServicio);
 
-                // Verifica si el servicio devolvió un error (null)
                 if ($reservasDelDia === null) {
-                    // El error ya debería estar logueado dentro del servicio
                     return "Hubo un problema interno al consultar la disponibilidad. Por favor, intenta de nuevo más tarde.";
                 }
 
                 Log::info("ReservaService call successful. Found " . count($reservasDelDia) . " reservations for " . $fechaParaServicio);
 
-                // --- Cálculo de Ocupación ---
 
-                // Inicializa el contador de ocupación para cada hora
                 $ocupacionPorHora = [];
                 for ($h = self::HORA_INICIO_OPERACION; $h < self::HORA_FIN_OPERACION; $h++) {
                     $ocupacionPorHora[$h] = 0;
                 }
 
-                // Calcula la ocupación basada en las reservas obtenidas
                 if (is_array($reservasDelDia) && !empty($reservasDelDia)) {
                     foreach ($reservasDelDia as $reserva) {
-                        // Asumiendo que el servicio ya devuelve solo 'Confirmada'
                         try {
                             $inicioReserva = Carbon::parse($reserva['hora_inicio']);
                             $finReserva = Carbon::parse($reserva['hora_fin']);
@@ -103,9 +94,6 @@ class ConsultaDisponibilidadCanchaHandler implements IntentHandlerInterface
                     }
                 }
 
-                // --- Determinación de Horas Disponibles ---
-
-                // Recolecta las horas donde la ocupación es menor al total de canchas
                 $horasDisponibles = [];
                 for ($h = self::HORA_INICIO_OPERACION; $h < self::HORA_FIN_OPERACION; $h++) {
                     if (isset($ocupacionPorHora[$h]) && $ocupacionPorHora[$h] < self::TOTAL_CANCHAS) {
@@ -119,7 +107,7 @@ class ConsultaDisponibilidadCanchaHandler implements IntentHandlerInterface
                         $horasOcupadas[] = sprintf('%02d:00', $h); // Formato HH:00
                     }
                 }
-                // --- Construcción de la Respuesta Final ---
+
 
                 if (empty($horasDisponibles)) {
                     $responseText = "Lo siento, no quedan horas disponibles para el {$fechaFormateada}. ¿Te gustaría consultar otra fecha?";
@@ -145,7 +133,6 @@ class ConsultaDisponibilidadCanchaHandler implements IntentHandlerInterface
             }
         }
 
-        // Devuelve la respuesta construida (o la por defecto si no hubo fecha)
         return $responseText;
     }
 }

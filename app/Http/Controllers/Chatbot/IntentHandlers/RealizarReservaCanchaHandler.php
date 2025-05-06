@@ -33,15 +33,13 @@ class RealizarReservaCanchaHandler implements IntentHandlerInterface
     {
         Log::info('Executing RealizarReservaCanchaHandler with params: ' . json_encode($parameters));
 
-        // --- 1. Obtener Parámetros ---
+        // parametros
         $fechaParam = $parameters['fecha'] ?? null;
         $horaInicioParam = $parameters['horaini'] ?? null;
         $horaFinParam = $parameters['horafin'] ?? null;
         $duracionParam = $parameters['duracion'] ?? null;
 
 
-
-        //verificar valores esten vacíos o nulos
         if (empty($fechaParam)) {
             Log::warning('RealizarReservaCanchaHandler: fechaParam missing or empty.');
             return "Por favor, indica la fecha para la reserva.";
@@ -59,15 +57,14 @@ class RealizarReservaCanchaHandler implements IntentHandlerInterface
 
         }
 
-        // --- 2. Parsear y Determinar Hora Inicio y Fin (con Prioridad) ---
+
         try {
             $fechaConsulta = Carbon::parse($fechaParam)->startOfDay();
             $fechaString = $fechaConsulta->toDateString();
             $horaInicioSoloTiempo = Carbon::parse($horaInicioParam)->format('H:i:s');
             $fechaHoraInicio = Carbon::parse($fechaString . ' ' . $horaInicioSoloTiempo);
             $fechaHoraFin = null;
-            //validacion reserva PROXIMOS 7 DIAS
-            $primerDiaPermitido = Carbon::today(); // Desde hoy
+            $primerDiaPermitido = Carbon::today();
             $ultimoDiaPermitido = Carbon::today()->addDays(self::MAX_DIAS_ANTICIPACION - 1)->endOfDay(); // Hoy + 6 días
             if (!$fechaConsulta->between($primerDiaPermitido, $ultimoDiaPermitido)) {
                 Log::warning("Reservation attempt outside allowed range ({$fechaConsulta->toDateString()}). Limit: {$ultimoDiaPermitido->toDateString()}");
@@ -75,14 +72,13 @@ class RealizarReservaCanchaHandler implements IntentHandlerInterface
             }
 
 
-            // --- Lógica de Prioridad ---
-            // Prioridad 1: Usar horafin si es válido
+
             if ($horaFinParam) {
                 try {
                     $horaFinSoloTiempo = Carbon::parse($horaFinParam)->format('H:i:s');
                     $horaFinTemp = Carbon::parse($fechaString . ' ' . $horaFinSoloTiempo);
                     if ($horaFinTemp->gt($fechaHoraInicio)) {
-                        $fechaHoraFin = $horaFinTemp; // Establece hora fin usando horafin
+                        $fechaHoraFin = $horaFinTemp;
                         Log::info("Using 'horafin'. End Time: " . $fechaHoraFin->format('Y-m-d H:i:s'));
                     } else {
                         Log::warning("'horafin' not after 'horaini'.");
@@ -92,20 +88,16 @@ class RealizarReservaCanchaHandler implements IntentHandlerInterface
                 }
             }
 
-            // Prioridad 2: Usar duracion si horafin NO FUE USADO/VALIDO y duracion es válido
-            // $fechaHoraFin === null asegura que solo entremos aquí si horafin no funcionó
             if ($fechaHoraFin === null && $duracionParam && isset($duracionParam['amount'], $duracionParam['unit']) && $duracionParam['amount'] > 0) {
                 try {
                     $unit = strtolower($duracionParam['unit']);
                     $amount = $duracionParam['amount'];
 
-                    // --- AJUSTE: Añadir unidades en español ---
                     $interval = match ($unit) {
                         'h', 'hr', 'hour', 'hours', 'hora', 'horas' => CarbonInterval::hours($amount),
                         'min', 'minute', 'minutes', 'minuto', 'minutos' => CarbonInterval::minutes($amount),
                         default => throw new \Exception("Unsupported duration unit: {$unit}"),
                     };
-                    // --- FIN AJUSTE ---
 
                     $finCalculado = $fechaHoraInicio->copy()->add($interval);
                     if ($finCalculado->gt($fechaHoraInicio)) {
@@ -126,7 +118,6 @@ class RealizarReservaCanchaHandler implements IntentHandlerInterface
             }
 
 
-            // --- Validaciones Finales ---
             if ($fechaHoraInicio->hour < self::HORA_INICIO_OPERACION || $fechaHoraFin->hour > self::HORA_FIN_OPERACION || ($fechaHoraFin->hour == self::HORA_FIN_OPERACION && $fechaHoraFin->minute > 0)) {
                 return "Lo siento, nuestro horario de reservas es de " . sprintf('%02d:00', self::HORA_INICIO_OPERACION) . " a " . sprintf('%02d:00', self::HORA_FIN_OPERACION) . ".";
             }
@@ -135,39 +126,29 @@ class RealizarReservaCanchaHandler implements IntentHandlerInterface
             }
 
         } catch (\Exception $e) {
-            // Este catch ahora también puede atrapar el error si $horaInicioParam era ""
             Log::error("Error processing date/time/duration: " . $e->getMessage(), ['params' => $parameters]);
             return "Hubo un error al interpretar la fecha u hora ('{$fechaParam}', '{$horaInicioParam}'). Por favor, verifica que los datos sean correctos.";
         }
 
 
-        // --- *** Búsqueda de Cliente *** ---
         Log::info("Looking up client for senderId: " . $senderId);
         $cliente = $this->clienteService->findClienteByTelefono($senderId);
 
         if (!$cliente) {
             Log::warning("Client not found for senderId: " . $senderId);
-            // Ajusta este mensaje según tu política (¿registrarse o contactar?)
             return "No te encontré en nuestro sistema. Para reservar, por favor acércate a recepción o regístrate si tenemos esa opción disponible.";
         }
         $clienteId = $cliente->cliente_id;
         Log::info("Client found: ID {$clienteId} ({$cliente->nombre})");
-        // --- *** FIN Búsqueda de Cliente *** ---
-
-
-        // --- *** Verificar Límite de 1 Reserva Futura *** ---
         Log::info("Checking future reservations for client {$clienteId}");
         if ($this->reservaService->clienteTieneReservaFutura($clienteId)) {
             Log::warning("Client {$clienteId} already has an upcoming reservation. Denying new one.");
-            // TODO: buscar y mostrar los detalles de la reserva existente si quieres.
             return "Hola {$cliente->nombre}, veo que ya tienes una reserva programada. Solo permitimos una reserva futura activa por cliente. Si deseas cambiarla, por favor cancela la existente primero o contacta a recepción.";
         }
         Log::info("Client {$clienteId} OK for new reservation.");
-        // --- *** FIN Verificar Límite *** ---
 
 
 
-        // --- 3. Re-Validación de Disponibilidad ---
         $fechaParaServicio = $fechaConsulta->toDateString();
         Log::info("Re-validating availability for {$fechaParaServicio} from {$fechaHoraInicio->format('H:i')} to {$fechaHoraFin->format('H:i')}");
         $reservasDelDia = $this->reservaService->getReservasConfirmadasPorFecha($fechaParaServicio);
@@ -186,9 +167,7 @@ class RealizarReservaCanchaHandler implements IntentHandlerInterface
             $horaTemp->addHour();
         }
 
-        // --- 4. Respuesta o Creación ---
         if (!$slotCompletamenteDisponible) {
-            // Slot NO disponible - Mostrar alternativas
             Log::info("Requested slot unavailable ({$fechaHoraInicio->format('H:i')}-{$fechaHoraFin->format('H:i')}). Showing available slots for {$fechaParaServicio}.");
             $horasDisponibles = $this->getHorasDisponibles($ocupacionPorHora);
             $fechaFormateada = $fechaConsulta->format('d/m/Y');
@@ -203,7 +182,6 @@ class RealizarReservaCanchaHandler implements IntentHandlerInterface
                 return $respuesta;
             }
         } else {
-            // Slot SÍ disponible - Intentar reservar
             Log::info("Requested slot available. Finding cancha and creating reservation.");
             $canchaIdParaReservar = $this->findAvailableCanchaId($reservasDelDia, $fechaHoraInicio, $fechaHoraFin);
 
@@ -212,54 +190,44 @@ class RealizarReservaCanchaHandler implements IntentHandlerInterface
                 return "Hubo un problema interno al asignar la cancha. Por favor, contacta a soporte.";
             }
 
-            // --- Lógica de Cliente ---
-            // --- *** Búsqueda o Creación de Cliente *** ---
             Log::info("Finding or creating client for senderId: " . $senderId);
 
             $cliente = $this->clienteService->findOrCreateByTelefono($senderId);
 
-            // Verifica si el servicio pudo encontrar o crear al cliente
             if (!$cliente) {
                 Log::error("Failed to find or create client for senderId: " . $senderId . ". Service returned null.");
-                // Indica un problema más grave (posiblemente error de BD al crear)
                 return "Tuvimos un problema al verificar tu información de cliente. Por favor, intenta de nuevo o contacta a administración.";
             }
-            $clienteId = $cliente->cliente_id; // Obtiene el ID (sea existente o nuevo)
+            $clienteId = $cliente->cliente_id;
             Log::info("Client confirmed/created: ID {$clienteId} ({$cliente->nombre})");
-            // --- *** FIN Búsqueda o Creación *** ---
-
-            // --- Lógica de Creación de Reserva ---
-            // --- *** Creación REAL de la Reserva *** ---
             Log::info("Attempting to create reservation: Client={$clienteId}, Cancha={$canchaIdParaReservar}, Date={$fechaParaServicio}, Start={$fechaHoraInicio->format('H:i:s')}, End={$fechaHoraFin->format('H:i:s')}");
 
-            // Prepara los datos para el servicio
-            // Asegúrate que los nombres de las claves coincidan con $fillable en el Modelo Reserva
             $datosReserva = [
                 'cliente_id' => $clienteId,
                 'cancha_id' => $canchaIdParaReservar,
-                'fecha' => $fechaParaServicio,          // Formato YYYY-MM-DD
-                'hora_inicio' => $fechaHoraInicio->format('H:i:s'), // Formato HH:MM:SS
-                'hora_fin' => $fechaHoraFin->format('H:i:s'),     // Formato HH:MM:SS
-                'estado' => 'Pendiente',                 // Estado inicial
-                'monto' => 50.00,                        // !! CALCULAR O OBTENER MONTO REAL !!
-                'metodo_pago' => "por confirmar",                   // O 'Por confirmar'
+                'fecha' => $fechaParaServicio,
+                'hora_inicio' => $fechaHoraInicio->format('H:i:s'),
+                'hora_fin' => $fechaHoraFin->format('H:i:s'),
+                'estado' => 'Pendiente',
+                'monto' => 50.00,    //todo cambiar monto dinamicamente o calcuar                    
+                'metodo_pago' => "por confirmar",
                 'pago_completo' => false,
             ];
 
             // Llama al servicio para crear la reserva
             $nuevaReserva = $this->reservaService->crearReserva($datosReserva);
 
-            if ($nuevaReserva instanceof \App\Models\Reserva) { // Verifica si se creó el objeto Reserva
+            if ($nuevaReserva instanceof \App\Models\Reserva) {
                 $fechaFormateada = $fechaConsulta->format('d/m/Y');
                 Log::info("Reservation created successfully. ID: " . $nuevaReserva->reserva_id);
-                // Mensaje de éxito
+
                 return "¡Reserva registrada exitosamente, {$cliente->nombre}! Para el {$fechaFormateada} de {$fechaHoraInicio->format('H:i')} a {$fechaHoraFin->format('H:i')} en la cancha #{$canchaIdParaReservar}. Estado: Pendiente. ¿Te puedo ayudar en algo más?";
             } else {
-                // Falló la creación en el servicio
+
                 Log::error("Failed creating reservation in service for client {$clienteId}.");
                 return "Lo siento, {$cliente->nombre}, ocurrió un error al intentar guardar tu reserva en nuestro sistema. Por favor, inténtalo de nuevo más tarde o contacta a recepción.";
             }
-            // --- *** FIN Creación REAL *** ---
+
         }
     }
 

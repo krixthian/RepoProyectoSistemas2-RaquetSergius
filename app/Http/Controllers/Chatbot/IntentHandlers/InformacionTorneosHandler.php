@@ -13,7 +13,6 @@ class InformacionTorneosHandler implements IntentHandlerInterface
     public function handle(array $parameters, string $senderId): string
     {
         Log::info('Executing InformacionTorneosHandler');
-        // --- Lógica que estaba en el case 'Información e inscripcion Torneos' ---
         $torneos = Torneo::whereIn('estado', ['programado', 'en curso'])
             ->with('evento')
             ->get();
@@ -30,7 +29,7 @@ class InformacionTorneosHandler implements IntentHandlerInterface
             }
             $responseText .= "\nSi deseas inscribirte o saber más de alguno, házmelo saber.";
         }
-        // --- Fin de la lógica del case ---
+
 
         return $responseText;
     }

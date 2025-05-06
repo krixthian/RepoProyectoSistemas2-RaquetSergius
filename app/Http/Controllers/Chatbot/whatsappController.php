@@ -438,9 +438,6 @@ class whatsappController extends Controller
                 'image' => [
                     // Usa 'link' para URL directa
                     'link' => $imageUrl,
-                    // Añade caption si no está vacío
-                    // La API requiere que 'caption' esté presente incluso si está vacío para algunos tipos,
-                    // pero para 'link' es opcional según la doc. Lo añadimos si existe.
                     // 'caption' => $caption // Descomentar si es necesario incluso vacío
                 ]
             ];
@@ -458,7 +455,7 @@ class whatsappController extends Controller
 
             if (!$response->successful()) {
                 Log::error('Error sending WhatsApp IMAGE message: ' . $response->body());
-                // Puedes añadir lógica aquí para intentar subir el medio si falla el link directo
+
                 return false;
             }
             return true;
