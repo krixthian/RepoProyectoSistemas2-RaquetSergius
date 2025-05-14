@@ -31,7 +31,7 @@ class CancelarReservaHandler implements IntentHandlerInterface
     public function handle(array $parameters, string $senderId): string
     {
         Log::info('Executing CancelarReservaHandler for senderId: ' . $senderId);
-        Carbon::setLocale('es'); // Para formatos de fecha en español
+        Carbon::setLocale('es');
 
         //buscar cliente
         $cliente = $this->clienteService->findClienteByTelefono($senderId);

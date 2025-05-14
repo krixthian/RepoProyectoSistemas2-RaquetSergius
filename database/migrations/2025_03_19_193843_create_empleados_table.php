@@ -19,6 +19,7 @@ return new class extends Migration {
             $table->string('telefono')->nullable();
             $table->string('email')->nullable();
             $table->boolean('activo')->default(true);
+            $table->string('remember_token')->nullable();
             $table->timestamps();
         });
     }
