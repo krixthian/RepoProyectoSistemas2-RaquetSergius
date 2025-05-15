@@ -77,3 +77,8 @@ Route::post('/logout', function (Request $request) {
     $request->session()->regenerateToken();
     return redirect('/login');
 })->name('logout');
+
+use App\Http\Controllers\ClienteController;
+
+Route::resource('clientes', ClienteController::class);
+
