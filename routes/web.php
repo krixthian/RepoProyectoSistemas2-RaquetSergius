@@ -2,71 +2,73 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
-use App\Models\Empleado; // Asumiendo que este modelo existe y es autenticable
+use App\Models\Empleado;
 use Illuminate\Support\Facades\Hash;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\IndexEmpleadoController;
+use Illuminate\Support\Facades\Log; // Añade esto al inicio del archivo si no está
+use Illuminate\Support\Facades\Auth; // Añade esto al inicio del archivo si no está
 
-use App\Http\Controllers\WhatsappController; // Asumiendo que existe
 
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\ResetPasswordController;
-use App\Http\Controllers\ReservaController; // <-- Importar el controlador de Reservas
+use App\Http\Controllers\ReservaController;
 
-// --- RUTAS PÚBLICAS ---
 
-// Ruta para mostrar el formulario de login
 Route::get('/login', function () {
-    // Si ya está logueado, redirigir al dashboard
+
     if (auth()->check()) {
-        return redirect()->route('dashboard');
+        return redirect()->intended('/admin/empleados');
     }
     return view('login');
-})->name('login'); // Nombre 'login' es importante para el middleware 'auth'
+})->name('login');
 
-// Ruta para procesar el login (Usando Empleado)
 Route::post('/login', function (Request $request) {
+    Log::info('Attempting login for user: ' . $request->usuario); // Log del intento
     $request->validate([
         'usuario' => 'required',
         'password' => 'required'
     ]);
 
-    // Asegúrate que tu modelo Empleado usa la columna 'contrasena'
-    // y que implementa la interfaz Authenticatable o extiende la clase User base.
     $empleado = Empleado::where('usuario', $request->usuario)->first();
 
     if ($empleado && Hash::check($request->password, $empleado->contrasena)) {
-        // Loguear al empleado
-        auth()->login($empleado, $request->filled('remember')); // Añadir 'remember me' si tienes el checkbox
-        // Regenerar sesión para seguridad
+        Log::info('Password check successful for user: ' . $empleado->usuario);
+
+        auth()->login($empleado, $request->filled('remember'));
+        Log::info('Auth::login called. Auth check immediately after: ' . (Auth::check() ? 'Authenticated, User ID: ' . Auth::id() : 'Not Authenticated'));
+        Log::info('Session ID after login call: ' . session()->getId());
+
         $request->session()->regenerate();
-        return redirect()->intended('/dashboard'); // Redirige a donde intentaba ir o al dashboard
+        Log::info('Session regenerated. New Session ID: ' . session()->getId());
+        Log::info('Auth check after session regenerate: ' . (Auth::check() ? 'Authenticated, User ID: ' . Auth::id() : 'Not Authenticated'));
+
+        return redirect()->intended('/admin/empleados');
     }
 
+    Log::warning('Login failed for user: ' . $request->usuario); // Log de fallo
     return back()->withErrors([
         'usuario' => 'Credenciales incorrectas.',
     ])->onlyInput('usuario');
-})->name('login.post'); // Puedes usar un nombre diferente si quieres
+})->name('login.post');
 
-// Rutas para la recuperación de contraseña
-// NOTA: Por defecto, estas rutas usan el provider 'users' de config/auth.php.
-// Si quieres que funcionen con 'Empleado', DEBES configurar un provider
-// para 'Empleado' en config/auth.php y posiblemente ajustar estos controladores.
+
 Route::get('password/reset', [ForgotPasswordController::class, 'showLinkRequestForm'])->name('password.request');
 Route::post('password/email', [ForgotPasswordController::class, 'sendResetLinkEmail'])->name('password.email');
 Route::get('password/reset/{token}', [ResetPasswordController::class, 'showResetForm'])->name('password.reset');
 Route::post('password/reset', [ResetPasswordController::class, 'reset'])->name('password.update');
 
 
-// --- RUTAS PROTEGIDAS (REQUIEREN LOGIN) ---
+// --- RUTAS PROTEGIDAS ---
 
-// Agrupa todas las rutas que necesitan autenticación
-//Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth'])->group(function () {
+    Route::get('/', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
+    Route::get('/admin/empleados', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::resource('reservas', ReservaController::class);
 
-    
+});
 
-//});
-// Ruta que utiliza el DashboardController
-Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
 // Ruta para el logout (Es buena práctica tener una ruta POST para logout)
 Route::post('/logout', function (Request $request) {
@@ -75,23 +77,3 @@ Route::post('/logout', function (Request $request) {
     $request->session()->regenerateToken();
     return redirect('/login');
 })->name('logout');
-
-// Rutas para el CRUD de Reservas (usando ReservaController)
-// El middleware 'auth' ya protege todo este grupo
-Route::resource('reservas', ReservaController::class);
-
-// Aquí puedes añadir más rutas que requieran login
-// Ejemplo: Route::get('/mi-perfil', [ProfileController::class, 'show'])->name('profile.show');
-
-// Ruta raíz (opcional, puedes dirigirla a donde prefieras)
-// Si quieres que la raíz redirija al login si no está autenticado,
-// o al dashboard si sí lo está.
-Route::get('/', function () {
-    if (auth()->check()) {
-        return redirect()->route('dashboard');
-    }
-    return redirect()->route('login');
-});
-
-// Ruta de Whatsapp (si necesitas que sea pública o protegida, ajústala)
-// Route::post('/whatsapp/send', [WhatsappController::class, 'sendMessage']);
