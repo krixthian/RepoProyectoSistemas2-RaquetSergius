@@ -2,29 +2,33 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
-use App\Models\Empleado; // Asumiendo que este modelo existe y es autenticable
+use App\Models\Empleado;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\WhatsappController; // Asumiendo que existe
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\ReservaController;
-use App\Http\Controllers\TorneoController; // Importación correcta
-use App\Http\Controllers\EquipoController; // Asegúrate de importar el controlador de Equipo
 
-// --- RUTAS PÚBLICAS ---
+use App\Http\Controllers\TorneoController;
+use App\Http\Controllers\EquipoController;
 
-// Ruta para mostrar el formulario de login
+use App\Http\Controllers\IndexEmpleadoController;
+
+use App\Http\Controllers\ClienteController;
+
+
 Route::get('/login', function () {
-    // Si ya está logueado, redirigir al dashboard
     if (auth()->check()) {
-        return redirect()->route('dashboard');
+        return redirect()->intended(route('admin.panel')); 
     }
     return view('login');
 })->name('login');
 
-// Ruta para procesar el login (Usando Empleado)
 Route::post('/login', function (Request $request) {
+    Log::info('Attempting login for user: ' . $request->usuario);
     $request->validate([
         'usuario' => 'required',
         'password' => 'required'
@@ -33,11 +37,21 @@ Route::post('/login', function (Request $request) {
     $empleado = Empleado::where('usuario', $request->usuario)->first();
 
     if ($empleado && Hash::check($request->password, $empleado->contrasena)) {
+        Log::info('Password check successful for user: ' . $empleado->usuario);
+
         auth()->login($empleado, $request->filled('remember'));
+        Log::info('Auth::login called. Auth check immediately after: ' . (Auth::check() ? 'Authenticated, User ID: ' . Auth::id() : 'Not Authenticated'));
+        Log::info('Session ID after login call: ' . session()->getId());
+
         $request->session()->regenerate();
-        return redirect()->intended('/dashboard');
+        Log::info('Session regenerated. New Session ID: ' . session()->getId());
+        Log::info('Auth check after session regenerate: ' . (Auth::check() ? 'Authenticated, User ID: ' . Auth::id() : 'Not Authenticated'));
+
+     
+        return redirect()->intended(route('admin.panel'));
     }
 
+    Log::warning('Login failed for user: ' . $request->usuario);
     return back()->withErrors([
         'usuario' => 'Credenciales incorrectas.',
     ])->onlyInput('usuario');
@@ -49,32 +63,24 @@ Route::post('password/email', [ForgotPasswordController::class, 'sendResetLinkEm
 Route::get('password/reset/{token}', [ResetPasswordController::class, 'showResetForm'])->name('password.reset');
 Route::post('password/reset', [ResetPasswordController::class, 'reset'])->name('password.update');
 
-// --- ¡RUTAS PÚBLICAS PARA TORNEOS! ---
-// Al mover Route::resource aquí, ya no requieren login.
-// GET /torneos (torneos.index) -> Muestra lista de torneos
-// GET /torneos/create (torneos.create) -> Muestra formulario para crear torneo
-// POST /torneos (torneos.store) -> Guarda el nuevo torneo
-// GET /torneos/{torneo} (torneos.show) -> Muestra un torneo específico
-// GET /torneos/{torneo}/edit (torneos.edit) -> Muestra formulario para editar torneo
-// PUT/PATCH /torneos/{torneo} (torneos.update) -> Actualiza el torneo
-// DELETE /torneos/{torneo} (torneos.destroy) -> Elimina el torneo
+// --- RUTAS PÚBLICAS ---
+
 Route::resource('torneos', TorneoController::class);
+Route::resource('equipos', EquipoController::class);
+
+
+Route::resource('clientes', ClienteController::class);
 // ------------------------------------
 
-// --- ¡NUEVAS RUTAS PÚBLICAS PARA EQUIPOS! ---
-// Estas rutas estarán accesibles sin necesidad de login.
-Route::resource('equipos', EquipoController::class);
-// -------------------------------------
+// --- RUTAS PROTEGIDAS  ---
+Route::middleware(['auth'])->group(function () {
 
-Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/admin/panel', [IndexEmpleadoController::class, 'index'])->name('admin.panel');
 
-// --- RUTAS PROTEGIDAS (REQUIEREN LOGIN) ---
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-// Agrupa todas las rutas que necesitan autenticación
-Route::middleware(['auth'])->group(function () { // Asegúrate de que el guard 'web' esté configurado para Empleado si es necesario
+    Route::resource('reservas', ReservaController::class);
 
-
-    // Ruta para el logout (Es buena práctica tener una ruta POST para logout)
     Route::post('/logout', function (Request $request) {
         auth()->logout();
         $request->session()->invalidate();
@@ -82,21 +88,13 @@ Route::middleware(['auth'])->group(function () { // Asegúrate de que el guard '
         return redirect('/login');
     })->name('logout');
 
-    // Rutas para el CRUD de Reservas (usando ReservaController)
-    Route::resource('reservas', ReservaController::class);
-
-    // Aquí puedes añadir más rutas que requieran login
-    // Ejemplo: Route::get('/mi-perfil', [ProfileController::class, 'show'])->name('profile.show');
-
-}); // FIN DEL GRUPO DE MIDDLEWARE AUTH
+});
+// ------------------------------------
 
 // Ruta raíz
 Route::get('/', function () {
     if (auth()->check()) {
-        return redirect()->route('dashboard');
+        return redirect()->route('admin.panel'); 
     }
     return redirect()->route('login');
 });
-
-// Ruta de Whatsapp (si necesitas que sea pública o protegida, ajústala)
-// Route::post('/whatsapp/send', [WhatsappController::class, 'sendMessage']);
