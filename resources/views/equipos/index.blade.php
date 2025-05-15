@@ -39,7 +39,6 @@
                             <td>{{ $equipo->nombre }}</td>
                             <td>
                                 @if($equipo->torneoPrincipal)
-                                    {{-- Asumiendo que tu modelo Torneo tiene 'deporte' y 'categoria' --}}
                                     {{ $equipo->torneoPrincipal->deporte }} - {{ $equipo->torneoPrincipal->categoria }}
                                     <small class="text-muted">(ID: {{ $equipo->torneoPrincipal->torneo_id }})</small>
                                 @else

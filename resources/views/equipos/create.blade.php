@@ -21,7 +21,6 @@
             <select class="form-select @error('capitan_id') is-invalid @enderror" id="capitan_id" name="capitan_id">
                 <option value="">Seleccionar Capitán</option>
                 @foreach($capitanes as $capitan)
-                    {{-- Asumiendo que $capitan tiene 'cliente_id' y 'nombre' --}}
                     <option value="{{ $capitan->cliente_id }}" {{ old('capitan_id') == $capitan->cliente_id ? 'selected' : '' }}>{{ $capitan->nombre }} {{ $capitan->apellido ?? '' }}</option>
                 @endforeach
             </select>
@@ -30,7 +29,6 @@
             @enderror
         </div>
 
-        {{-- INICIO: Campo Nuevo para Torneo Principal --}}
 <div class="mb-3">
     <label for="torneo_principal_id" class="form-label">Torneo Principal Asignado</label>
     <select class="form-select @error('torneo_principal_id') is-invalid @enderror" id="torneo_principal_id" name="torneo_principal_id" required>
@@ -43,10 +41,8 @@
         <div class="invalid-feedback">{{ $message }}</div>
     @enderror
 </div>
-{{-- FIN: Campo Nuevo para Torneo Principal --}}
 
 
-        {{-- Opcional: Si quieres permitir asociar a OTRO torneo a través de la tabla pivote en el mismo formulario --}}
         {{-- <div class="mb-3">
             <label for="torneo_id_para_asociar_pivote" class="form-label">Inscribir Adicionalmente en Torneo (Pivote)</label>
             <select class="form-select @error('torneo_id_para_asociar_pivote') is-invalid @enderror" id="torneo_id_para_asociar_pivote" name="torneo_id_para_asociar_pivote">

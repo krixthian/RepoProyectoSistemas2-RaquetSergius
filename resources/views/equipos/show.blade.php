@@ -16,7 +16,6 @@
                     <p class="card-text">
                         <strong>Nombre del Torneo:</strong> {{ $equipo->torneoPrincipal->deporte }} - {{ $equipo->torneoPrincipal->categoria }}<br>
                         <strong>ID del Torneo:</strong> {{ $equipo->torneoPrincipal->torneo_id }}
-                        {{-- Puedes agregar más detalles del torneo si los tienes, ej: $equipo->torneoPrincipal->fecha_inicio --}}
                     </p>
                 @else
                     <p class="card-text text-muted">Este equipo no tiene un torneo principal asignado directamente.</p>
@@ -27,18 +26,15 @@
                     <p class="card-text">
                         <strong>Nombre:</strong> {{ $equipo->capitan->nombre }} {{ $equipo->capitan->apellido ?? '' }}<br>
                         <strong>ID del Capitán:</strong> {{ $equipo->capitan->cliente_id }}
-                        {{-- Puedes agregar más detalles del capitán si los tienes, ej: $equipo->capitan->email --}}
                     </p>
                 @else
                     <p class="card-text text-muted">Este equipo no tiene un capitán asignado.</p>
                 @endif
 
-                {{-- Opcional: Mostrar otros torneos de la tabla pivote --}}
                 @if($equipo->torneos && $equipo->torneos->count() > 0)
                     <h5 class="mt-4">Inscripciones Adicionales en Torneos (Tabla Pivote)</h5>
                     <ul class="list-group">
                         @foreach($equipo->torneos as $torneoInscrito)
-                            {{-- Para no repetir si el torneo principal también está en la pivote --}}
                             @if(!$equipo->torneoPrincipal || $equipo->torneoPrincipal->torneo_id != $torneoInscrito->torneo_id)
                                 <li class="list-group-item">
                                     {{ $torneoInscrito->deporte }} - {{ $torneoInscrito->categoria }}

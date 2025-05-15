@@ -1,6 +1,5 @@
-{{-- Suponiendo que tienes un layout base como app.blade.php --}}
-@extends('layouts.app') {{-- O el nombre de tu layout principal --}}
 
+@extends('layouts.app') 
 @section('content')
 <div class="container">
     <h1>Lista de Torneos</h1>
@@ -21,7 +20,6 @@
         <thead>
             <tr>
                 <th>ID</th>
-                {{-- COLUMNA "EVENTO ID" ELIMINADA DE AQUÍ --}}
                 <th>Categoría</th>
                 <th>Deporte</th>
                 <th>Nº Equipos</th>
@@ -33,7 +31,6 @@
             @forelse ($torneos as $torneo)
                 <tr>
                     <td>{{ $torneo->torneo_id }}</td>
-                    {{-- CELDA DE DATOS PARA "EVENTO ID" ELIMINADA DE AQUÍ --}}
                     <td>{{ $torneo->categoria }}</td>
                     <td>{{ $torneo->deporte }}</td>
                     <td>{{ $torneo->num_equipos }}</td>
@@ -50,7 +47,6 @@
                 </tr>
             @empty
                 <tr>
-                    {{-- AJUSTADO EL COLSPAN DE 7 A 6 --}}
                     <td colspan="6">No hay torneos registrados.</td>
                 </tr>
             @endforelse
