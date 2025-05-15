@@ -95,3 +95,8 @@ Route::get('/', function () {
 
 // Ruta de Whatsapp (si necesitas que sea pública o protegida, ajústala)
 // Route::post('/whatsapp/send', [WhatsappController::class, 'sendMessage']);
+
+//Ruta para clientes (dcmq)
+use App\Http\Controllers\ClienteController;
+
+Route::resource('clientes', ClienteController::class);
