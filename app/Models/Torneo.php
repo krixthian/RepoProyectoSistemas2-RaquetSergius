@@ -29,6 +29,6 @@ class Torneo extends Model
 
     public function equipos()
     {
-        return $this->hasMany(Equipo::class, 'torneo_id', 'torneo_id');
+        return $this->belongsToMany(Equipo::class, 'torneo_equipo', 'torneo_id', 'equipo_id');
     }
 }

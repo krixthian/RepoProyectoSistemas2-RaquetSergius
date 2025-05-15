@@ -13,23 +13,32 @@ class Equipo extends Model
     protected $primaryKey = 'equipo_id';
     protected $fillable = [
         'nombre',
-        'torneo_id',
         'capitan_id',
+        'torneo_id', // Es crucial que esté aquí
     ];
-
-    protected $casts = [
-        'torneo_id' => 'integer',
-        'capitan_id' => 'integer',
-    ];
-    public function torneo()
-    {
-        return $this->belongsTo(Torneo::class, 'torneo_id', 'torneo_id');
-    }
 
     public function capitan()
     {
         return $this->belongsTo(Cliente::class, 'capitan_id', 'cliente_id');
     }
 
-    // Puedes agregar aquí las relaciones con otras tablas si las hubiera
+    /**
+     * Obtiene el torneo principal al que el equipo está directamente asignado.
+     */
+    public function torneoPrincipal()
+    {
+        // El primer argumento es el modelo relacionado (Torneo::class)
+        // El segundo argumento es la clave foránea en la tabla 'equipos' (torneo_id)
+        // El tercer argumento es la clave primaria en la tabla 'torneos' (torneo_id)
+        return $this->belongsTo(Torneo::class, 'torneo_id', 'torneo_id');
+    }
+
+    /**
+     * Obtiene todos los torneos en los que el equipo está inscrito
+     * (a través de la tabla pivote torneo_equipo).
+     */
+    public function torneos()
+    {
+        return $this->belongsToMany(Torneo::class, 'torneo_equipo', 'equipo_id', 'torneo_id');
+    }
 }
