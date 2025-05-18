@@ -22,7 +22,7 @@ use App\Http\Controllers\ClienteController;
 
 Route::get('/login', function () {
     if (auth()->check()) {
-        return redirect()->intended(route('admin.panel')); 
+        return redirect()->intended(route('admin.empleados.index'));
     }
     return view('login');
 })->name('login');
@@ -47,7 +47,7 @@ Route::post('/login', function (Request $request) {
         Log::info('Session regenerated. New Session ID: ' . session()->getId());
         Log::info('Auth check after session regenerate: ' . (Auth::check() ? 'Authenticated, User ID: ' . Auth::id() : 'Not Authenticated'));
 
-     
+
         return redirect()->intended(route('admin.panel'));
     }
 
@@ -75,7 +75,7 @@ Route::resource('clientes', ClienteController::class);
 // --- RUTAS PROTEGIDAS  ---
 Route::middleware(['auth'])->group(function () {
 
-    Route::get('/admin/panel', [IndexEmpleadoController::class, 'index'])->name('admin.panel');
+    Route::get('/admin/panel', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
@@ -94,7 +94,7 @@ Route::middleware(['auth'])->group(function () {
 // Ruta raíz
 Route::get('/', function () {
     if (auth()->check()) {
-        return redirect()->route('admin.panel'); 
+        return redirect()->route('admin.empleados.index');
     }
     return redirect()->route('login');
 });
