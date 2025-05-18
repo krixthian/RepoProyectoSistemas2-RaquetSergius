@@ -65,9 +65,9 @@ class whatsappController extends Controller
         'Consulta Reserva' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaReservaHandler::class,
 
         //MAPEO ZUMBA
-        'Consulta Horarios Zumba' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaHorariosZumbaHandler::class, // Tu handler modificado
-        'Inscripcion Clase Zumba' => \App\Http\Controllers\Chatbot\IntentHandlers\InscripcionClaseZumbaHandler::class,
-        // ... otros handlers
+        'Consulta Horarios Zumba' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaHorariosZumbaHandler::class,
+        'Inscribir Clase Zumba' => \App\Http\Controllers\Chatbot\IntentHandlers\InscribirClaseZumbaHandler::class,
+        // ...
     ];
 
     /**
@@ -75,7 +75,7 @@ class whatsappController extends Controller
      */
     public function escuchar(Request $request)
     {
-        // Validación del Webhook (GET request)
+        // whatsapp webhook get
         if ($request->isMethod('get') && $request->has('hub_mode') && $request->has('hub_verify_token')) {
             if ($request->input('hub_mode') === 'subscribe' && $request->input('hub_verify_token') === $this->verifyToken) {
                 Log::info('WhatsApp Webhook Validation Success.');
@@ -86,7 +86,7 @@ class whatsappController extends Controller
             }
         }
 
-        // Procesamiento de Mensajes (POST request)
+        // procesar mensajes post
         if ($request->isMethod('post')) {
             $data = $request->json()->all();
             Log::info('Incoming WhatsApp Data: ' . json_encode($data));
@@ -106,7 +106,6 @@ class whatsappController extends Controller
                         $dialogflowResponse = $this->processDialogflowViaHttp($messageText, $senderPhone);
 
                         // *** Verificar tipo de respuesta y enviar mensaje ***
-                        // *** MODIFICACIÓN: Verificar tipo de respuesta y enviar ***
                         if ($dialogflowResponse) {
                             if (is_string($dialogflowResponse)) {
                                 // Respuesta de texto normal
@@ -114,18 +113,17 @@ class whatsappController extends Controller
                             } elseif (is_array($dialogflowResponse) && isset($dialogflowResponse['type'])) {
                                 switch ($dialogflowResponse['type']) {
                                     case 'location':
-                                        // Respuesta de ubicación (ya la tenías)
+                                        // Respuesta de ubicación
                                         $this->sendWhatsAppLocation(
                                             $senderPhone,
-                                            $dialogflowResponse['latitude'] ?? 0, // Valor por defecto por si acaso
+                                            $dialogflowResponse['latitude'] ?? 0,
                                             $dialogflowResponse['longitude'] ?? 0,
                                             $dialogflowResponse['name'] ?? '',
                                             $dialogflowResponse['address'] ?? ''
                                         );
                                         break;
                                     case 'image':
-                                        // NUEVO: Respuesta de imagen
-                                        // Asegúrate que las claves 'url' (o 'id') y 'caption' existan
+                                        // Respuesta de imagen
                                         if (isset($dialogflowResponse['url']) && isset($dialogflowResponse['caption'])) {
                                             $this->sendWhatsAppImage(
                                                 $senderPhone,
@@ -149,10 +147,7 @@ class whatsappController extends Controller
                             }
                         } else {
                             Log::error("No response received from Dialogflow HTTP processing for message: {$messageText}");
-                            // $this->sendWhatsAppMessage($senderPhone, "Lo siento, no pude procesar tu solicitud en este momento."); // Comentado para evitar respuestas si falla DF
                         }
-                        // *** FIN MODIFICACIÓN ***
-                        // *** Fin Verificación y envío ***
 
                     } else {
                         Log::info('Ignoring non-text message type: ' . ($messageData['type'] ?? 'unknown'));
@@ -179,7 +174,6 @@ class whatsappController extends Controller
         }
 
         try {
-            // Define el scope necesario para Dialogflow API
             $scopes = ['https://www.googleapis.com/auth/cloud-platform', 'https://www.googleapis.com/auth/dialogflow'];
 
             $credentials = new ServiceAccountCredentials($scopes, $this->googleCredentialsPath);
@@ -203,9 +197,9 @@ class whatsappController extends Controller
     /**
      * Procesa el mensaje llamando a la API REST de Dialogflow Detect Intent.
      *
-     * @param string $message El texto enviado por el usuario.
-     * @param string $senderId Un ID único para la sesión (ej. número de teléfono).
-     * @return string|null El texto de respuesta de Dialogflow o null en caso de error.
+     * @param string $message
+     * @param string $senderId
+     * @return string|null
      */
     private function processDialogflowViaHttp(string $message, string $senderId): string|array|null
     {
@@ -221,7 +215,7 @@ class whatsappController extends Controller
         }
 
         // 2. Preparar la Llamada a la API
-        $sessionId = 'whatsapp-' . $senderId; // ID de sesión único
+        $sessionId = 'whatsapp-' . $senderId;
         $apiUrl = "https://dialogflow.googleapis.com/v2/projects/{$this->projectId}/agent/sessions/{$sessionId}:detectIntent";
 
         $requestBody = [
@@ -231,9 +225,6 @@ class whatsappController extends Controller
                     'languageCode' => $this->languageCode,
                 ],
             ],
-            // Opcional: se puede enviar más contextos o parámetros aquí
-            // 'queryParams' => [ 'contexts' => $contextos ],
-            // 'queryParams' => [ 'timeZone' => 'America/La_Paz' ]
         ];
 
         // 3. Realizar la Llamada HTTP
@@ -249,18 +240,17 @@ class whatsappController extends Controller
                 Log::info("Dialogflow REST API Response: " . json_encode($responseData));
 
                 $queryResult = $responseData['queryResult'] ?? null;
-                if (!$queryResult) { /* ... manejo de error ... */
+                if (!$queryResult) {
                 }
 
                 $detectedIntent = $queryResult['intent']['displayName'] ?? null;
                 $parameters = $queryResult['parameters'] ?? [];
-                $fulfillmentText = $queryResult['fulfillmentText'] ?? "Disculpa, no entendí bien."; // Fallback
+                $fulfillmentText = $queryResult['fulfillmentText'] ?? "Disculpa, no entendí bien.";
 
                 Log::info("Intent: {$detectedIntent}, Params: " . json_encode($parameters));
 
                 // --- Lógica para invocar el Handler ---
-                $responseText = $fulfillmentText; // Respuesta por defecto
-
+                $finalResponse = null;
 
                 if ($detectedIntent == "ubicacion") {
                     Log::info("Handling 'ubicacion' intent. Preparing location response.");
@@ -271,39 +261,59 @@ class whatsappController extends Controller
                         'name' => self::LOCATION_NAME,
                         'address' => self::LOCATION_ADDRESS
                     ];
-                    return $finalResponse;
                 } elseif ($detectedIntent == "comunicar recepcion") {
-                    return "Claro!, puedes comunicarte con la recepción al número de telefono fijo 2418133";
+                    Log::info("Handling 'comunicar recepcion' intent.");
+                    $finalResponse = "Claro!, puedes comunicarte con la recepción al número de telefono fijo 2418133";
                 } elseif ($detectedIntent && isset($this->intentHandlerMap[$detectedIntent])) {
                     $handlerClass = $this->intentHandlerMap[$detectedIntent];
                     try {
-                        // Usamos el contenedor de servicios de Laravel para instanciar
-                        // Esto permite inyección de dependencias si la necesitas en tus handlers
                         $handlerInstance = app($handlerClass);
 
                         if ($handlerInstance instanceof IntentHandlerInterface) {
-                            // Llama al método handle del handler específico
-                            $responseText = $handlerInstance->handle($parameters, $senderId);
+                            $handlerOutput = $handlerInstance->handle($parameters, $senderId);
+
+                            if (is_string($handlerOutput)) {
+                                $finalResponse = $handlerOutput;
+                            } elseif (is_array($handlerOutput)) {
+                                if (isset($handlerOutput['type'])) {
+                                    $finalResponse = $handlerOutput;
+                                } elseif (isset($handlerOutput['fulfillmentText']) && is_string($handlerOutput['fulfillmentText'])) {
+                                    $finalResponse = $handlerOutput['fulfillmentText'];
+                                } else {
+                                    Log::error("Handler {$handlerClass} returned an array in an unexpected format: " . json_encode($handlerOutput));
+                                    $finalResponse = "Hubo un error al procesar tu solicitud (respuesta de handler inesperada).";
+                                }
+                            } else {
+                                Log::error("Handler {$handlerClass} returned an unexpected data type: " . gettype($handlerOutput));
+                                $finalResponse = "Hubo un error al procesar tu solicitud (tipo de handler inesperado).";
+                            }
                         } else {
                             Log::error("La clase {$handlerClass} no implementa IntentHandlerInterface.");
-                            $responseText = "Error interno al procesar la solicitud (Handler inválido).";
+                            $finalResponse = "Error interno al procesar la solicitud (Handler inválido).";
                         }
-                    } catch (\Throwable $handlerError) { // Captura errores al instanciar o ejecutar el handler
+                    } catch (\Throwable $handlerError) {
                         Log::error("Error ejecutando handler {$handlerClass}: " . $handlerError->getMessage() . "\n" . $handlerError->getTraceAsString());
-                        $responseText = "Ocurrió un error procesando tu solicitud sobre '{$detectedIntent}'.";
+                        $finalResponse = "Ocurrió un error procesando tu solicitud sobre '{$detectedIntent}'.";
                     }
                 } else {
-                    // Intent no mapeado o no detectado, usamos el fulfillmentText de Dialogflow
+                    // Intent no mapeado o no detectado
                     Log::info("No specific handler found for intent '{$detectedIntent}'. Using Dialogflow's fulfillment text.");
+                    $finalResponse = $fulfillmentText;
                 }
                 // --- Fin Lógica para invocar el Handler ---
 
-                return $responseText; // Devuelve la respuesta generada por el handler o el fallback
+                // Si $finalResponse sigue siendo null aquí (no debería pasar si hay un fulfillmentText de Dialogflow)
+                if (is_null($finalResponse)) {
+                    Log::warning("Final response is null after intent processing for intent: {$detectedIntent}. Falling back to generic error.");
+                    return "Lo siento, no pude procesar tu solicitud en este momento.";
+                }
+
+                return $finalResponse; // Devuelve la respuesta procesada
 
             } else {
-                // Error en la llamada a la API de Dialogflow
+
                 Log::error("Error calling Dialogflow REST API. Status: " . $response->status() . " Body: " . $response->body());
-                // Intenta dar un mensaje útil si es un error conocido
+
                 $errorBody = $response->json();
                 $errorMessage = $errorBody['error']['message'] ?? 'Error desconocido';
                 return "Hubo un problema contactando al asistente (Error API: " . $response->status() . " - " . $errorMessage . ").";
@@ -317,10 +327,10 @@ class whatsappController extends Controller
     }
 
     /**
-     * Envía un mensaje de texto a través de la API de WhatsApp Cloud.
-     * @param string $recipient El número de teléfono del destinatario.
-     * @param string $message El texto del mensaje a enviar.
-     * @return bool True si el mensaje se envió (o al menos se intentó), False en caso de error.
+     * enviar un mensaje de texto
+     * @param string $recipient
+     * @param string $message
+     * @return bool
      */
     private function sendWhatsAppMessage(string $recipient, string $message): bool
     {
@@ -356,13 +366,12 @@ class whatsappController extends Controller
 
 
     /**
-     * Envía un mensaje de ubicación a través de la API de WhatsApp Cloud.
-     * @param string $recipient El número de teléfono del destinatario.
-     * @param float $latitude Latitud.
-     * @param float $longitude Longitud.
-     * @param string $name Nombre del lugar (opcional).
-     * @param string $address Dirección del lugar (opcional).
-     * @return bool True si el mensaje se envió (o al menos se intentó), False en caso de error.
+     * @param string $recipient
+     * @param float $latitude
+     * @param float $longitude
+     * @param string $name
+     * @param string $address
+     * @return bool
      */
     private function sendWhatsAppLocation(string $recipient, float $latitude, float $longitude, string $name = '', string $address = ''): bool
     {
@@ -376,7 +385,7 @@ class whatsappController extends Controller
                 'latitude' => $latitude,
                 'longitude' => $longitude,
             ];
-            // Añadir nombre y dirección solo si tienen valor
+
             if (!empty($name)) {
                 $locationData['name'] = $name;
             }
@@ -396,7 +405,7 @@ class whatsappController extends Controller
             $response = Http::withToken($this->wsToken)->post($url, $payload);
 
             Log::info('WhatsApp API Response Status: ' . $response->status());
-            Log::debug('WhatsApp API Response Body: ' . $response->body()); // Debug para no llenar logs
+            Log::debug('WhatsApp API Response Body: ' . $response->body());
 
             if (!$response->successful()) {
                 Log::error('Error sending WhatsApp LOCATION message: ' . $response->body());
@@ -410,11 +419,10 @@ class whatsappController extends Controller
     }
 
     /**
-     * Envía un mensaje de imagen usando una URL pública.
-     * @param string $recipient Número de teléfono.
-     * @param string $imageUrl URL pública de la imagen (HTTPS recomendado).
-     * @param string $caption Texto que acompaña a la imagen (opcional).
-     * @return bool Éxito o fallo.
+     * @param string $recipient
+     * @param string $imageUrl
+     * @param string $caption
+     * @return bool
      */
     private function sendWhatsAppImage(string $recipient, string $imageUrl, string $caption = ''): bool
     {
@@ -428,7 +436,7 @@ class whatsappController extends Controller
         }
 
         try {
-            $url = "https://graph.facebook.com/v22.0/{$this->whatsappBusinessId}/messages"; // Usa la versión de API que necesites
+            $url = "https://graph.facebook.com/v22.0/{$this->whatsappBusinessId}/messages";
 
             $payload = [
                 'messaging_product' => 'whatsapp',
@@ -438,10 +446,9 @@ class whatsappController extends Controller
                 'image' => [
                     // Usa 'link' para URL directa
                     'link' => $imageUrl,
-                    // 'caption' => $caption // Descomentar si es necesario incluso vacío
+                    // 'caption' => $caption
                 ]
             ];
-            // Añadir caption solo si tiene contenido
             if (!empty($caption)) {
                 $payload['image']['caption'] = $caption;
             }
@@ -451,7 +458,7 @@ class whatsappController extends Controller
             $response = Http::withToken($this->wsToken)->post($url, $payload);
 
             Log::info('WhatsApp API Response Status (Image): ' . $response->status());
-            Log::debug('WhatsApp API Response Body (Image): ' . $response->body()); // Debug para no llenar logs
+            Log::debug('WhatsApp API Response Body (Image): ' . $response->body());
 
             if (!$response->successful()) {
                 Log::error('Error sending WhatsApp IMAGE message: ' . $response->body());
@@ -467,8 +474,7 @@ class whatsappController extends Controller
 
 
     /**
-     * Maneja la verificación inicial del webhook por parte de Meta/WhatsApp.
-     * La ruta get para la verificación del webhook.
+     * verificacion get del webhook de whatsapp
      */
     public function verifyToken(Request $request)
     {
