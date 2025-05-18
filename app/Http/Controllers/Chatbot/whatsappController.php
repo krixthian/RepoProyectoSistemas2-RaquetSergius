@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Exception;
 
+
 // Imports para la autenticación de Google
 use Google\Auth\Credentials\ServiceAccountCredentials;
 use Google\Auth\HttpHandler\HttpHandlerFactory;
@@ -26,11 +27,7 @@ class whatsappController extends Controller
     protected $whatsappBusinessId;
     protected $verifyToken;
 
-    // DATOS UBICACION ---
-    private const LOCATION_LATITUDE = -16.498637;
-    private const LOCATION_LONGITUDE = -68.132286;
-    private const LOCATION_NAME = 'Ubicación de Raquet Sergius';
-    private const LOCATION_ADDRESS = 'Nos encontramos en la calle Ascarrunz!';
+
     // -----------------------------------------------------------
 
     public function __construct()
@@ -68,6 +65,21 @@ class whatsappController extends Controller
         'Consulta Horarios Zumba' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaHorariosZumbaHandler::class,
         'Inscribir Clase Zumba' => \App\Http\Controllers\Chatbot\IntentHandlers\InscribirClaseZumbaHandler::class,
         // ...
+
+        // MAPEO MENU
+        'Chatbot_Menu_Principal' => \App\Http\Controllers\Chatbot\IntentHandlers\MenuPrincipalHandler::class,
+        'Chatbot_Menu_Mis_Datos' => \App\Http\Controllers\Chatbot\IntentHandlers\MenuMisDatosHandler::class,
+        'Chatbot_Menu_Info_Club' => \App\Http\Controllers\Chatbot\IntentHandlers\MenuInfoClubHandler::class, // Handler para submenú de info
+        'Chatbot_Menu_Direccion' => \App\Http\Controllers\Chatbot\IntentHandlers\MenuDireccionHandler::class,
+        'Chatbot_Menu_Sobre_Nosotros' => \App\Http\Controllers\Chatbot\IntentHandlers\MenuSobreNosotrosHandler::class,
+        'Chatbot_Menu_Contacto_Directo' => \App\Http\Controllers\Chatbot\IntentHandlers\MenuContactoDirectoHandler::class,
+
+        // Intents para el flujo de actualizar datos (despues)
+        'Chatbot_MisDatos_SolicitarNombre' => \App\Http\Controllers\Chatbot\IntentHandlers\MisDatosSolicitarNombreHandler::class,
+        'Chatbot_MisDatos_CapturarNombre' => \App\Http\Controllers\Chatbot\IntentHandlers\MisDatosCapturarNombreHandler::class,
+        'Chatbot_MisDatos_SolicitarEmail' => \App\Http\Controllers\Chatbot\IntentHandlers\MisDatosSolicitarEmailHandler::class,
+        'Chatbot_MisDatos_CapturarEmail' => \App\Http\Controllers\Chatbot\IntentHandlers\MisDatosCapturarEmailHandler::class,
+
     ];
 
     /**
@@ -95,62 +107,96 @@ class whatsappController extends Controller
                 if (isset($data['entry'][0]['changes'][0]['value']['messages'][0])) {
                     $messageData = $data['entry'][0]['changes'][0]['value']['messages'][0];
 
-                    if (isset($messageData['type']) && $messageData['type'] === 'text') {
+                    $messageType = $messageData['type'] ?? null;
+                    $messageText = null;
+                    $senderPhone = $messageData['from'];
+                    $messageId = $messageData['id'];
+
+                    if ($messageType === 'text') {
                         $messageText = $messageData['text']['body'];
-                        $senderPhone = $messageData['from'];
-                        $messageId = $messageData['id'];
+                        Log::info("Received TEXT message from {$senderPhone}: {$messageText}");
 
-                        Log::info("Message from {$senderPhone}: {$messageText}");
+                    } elseif ($messageType === 'interactive') {
+                        if (isset($messageData['interactive']['type'])) {
+                            $interactiveType = $messageData['interactive']['type'];
+                            if ($interactiveType === 'button_reply') {
+                                $messageText = $messageData['interactive']['button_reply']['id'];
+                                $buttonTitle = $messageData['interactive']['button_reply']['title'];
+                                Log::info("Received INTERACTIVE BUTTON_REPLY from {$senderPhone}. ID: {$messageText}, Title: {$buttonTitle}");
+                            } elseif ($interactiveType === 'list_reply') {
+                                $messageText = $messageData['interactive']['list_reply']['id'];
+                                $listTitle = $messageData['interactive']['list_reply']['title'];
+                                Log::info("Received INTERACTIVE LIST_REPLY from {$senderPhone}. ID: {$messageText}, Title: {$listTitle}");
+                            } else {
+                                Log::warning("Received unknown interactive type: {$interactiveType} from {$senderPhone}");
+                            }
+                        } else {
+                            Log::warning("Received interactive message without a subtype from {$senderPhone}");
+                        }
+                    } else {
+                        Log::info('Ignoring unhandled message type: ' . $messageType . ' from ' . $senderPhone);
+                    }
 
-                        // *** Llama a Dialogflow usando HTTP directa ***
+                    // Solo procesar si hemos extraído un $messageText para Dialogflow
+                    if ($messageText !== null) {
+                        Log::info("Processing input for Dialogflow from {$senderPhone}: {$messageText}");
                         $dialogflowResponse = $this->processDialogflowViaHttp($messageText, $senderPhone);
 
-                        // *** Verificar tipo de respuesta y enviar mensaje ***
+                        // ---- INICIO Sección de envío de respuesta ----
                         if ($dialogflowResponse) {
                             if (is_string($dialogflowResponse)) {
-                                // Respuesta de texto normal
                                 $this->sendWhatsAppMessage($senderPhone, $dialogflowResponse);
                             } elseif (is_array($dialogflowResponse) && isset($dialogflowResponse['type'])) {
                                 switch ($dialogflowResponse['type']) {
                                     case 'location':
-                                        // Respuesta de ubicación
                                         $this->sendWhatsAppLocation(
                                             $senderPhone,
-                                            $dialogflowResponse['latitude'] ?? 0,
-                                            $dialogflowResponse['longitude'] ?? 0,
-                                            $dialogflowResponse['name'] ?? '',
-                                            $dialogflowResponse['address'] ?? ''
+                                            $dialogflowResponse['latitude'] ?? -16.512638,
+                                            $dialogflowResponse['longitude'] ?? -68.122094,
+                                            $dialogflowResponse['name'] ?? 'Ubicación',
+                                            $dialogflowResponse['address'] ?? 'Dirección no especificada'
                                         );
                                         break;
                                     case 'image':
-                                        // Respuesta de imagen
-                                        if (isset($dialogflowResponse['url']) && isset($dialogflowResponse['caption'])) {
+                                        if (isset($dialogflowResponse['url'])) {
                                             $this->sendWhatsAppImage(
                                                 $senderPhone,
                                                 $dialogflowResponse['url'],
-                                                $dialogflowResponse['caption']
+                                                $dialogflowResponse['caption'] ?? ''
                                             );
                                         } else {
-                                            Log::error("Invalid image structure from handler: " . json_encode($dialogflowResponse));
-                                            $this->sendWhatsAppMessage($senderPhone, "Hubo un error al preparar la imagen de horarios.");
+                                            Log::error("Invalid image structure from handler (missing url): " . json_encode($dialogflowResponse));
+                                            $this->sendWhatsAppMessage($senderPhone, "Hubo un error al preparar la imagen.");
+                                        }
+                                        break;
+                                    case 'interactive_buttons':
+                                        if (isset($dialogflowResponse['text']) && isset($dialogflowResponse['buttons']) && is_array($dialogflowResponse['buttons'])) {
+                                            $this->sendWhatsAppInteractiveButtons(
+                                                $senderPhone,
+                                                $dialogflowResponse['text'],
+                                                $dialogflowResponse['buttons'],
+                                                $dialogflowResponse['header'] ?? null
+                                            );
+                                        } else {
+                                            Log::error("Invalid interactive_buttons structure from handler: " . json_encode($dialogflowResponse));
+                                            $this->sendWhatsAppMessage($senderPhone, "Hubo un error al preparar el menú.");
                                         }
                                         break;
                                     default:
-                                        // Tipo de respuesta no esperado
-                                        Log::error("Unexpected response type from handler: " . json_encode($dialogflowResponse));
-                                        $this->sendWhatsAppMessage($senderPhone, "Hubo un error inesperado al procesar tu solicitud.");
+                                        Log::error("Unexpected response type ('type' key present but not handled) from handler: " . json_encode($dialogflowResponse));
+                                        $this->sendWhatsAppMessage($senderPhone, "Hubo un error inesperado procesando tu solicitud.");
                                 }
                             } else {
-                                // Tipo de respuesta no string ni array esperado
-                                Log::error("Unexpected response format from Dialogflow processing: " . gettype($dialogflowResponse));
-                                $this->sendWhatsAppMessage($senderPhone, "Hubo un error interno al procesar tu solicitud.");
+                                Log::error("Unexpected response format from Dialogflow processing or handler (array without 'type', or not string/array): " . json_encode($dialogflowResponse));
+                                $this->sendWhatsAppMessage($senderPhone, "Hubo un error interno al procesar tu solicitud (formato inesperado).");
                             }
                         } else {
-                            Log::error("No response received from Dialogflow HTTP processing for message: {$messageText}");
-                        }
+                            Log::error("No response (null) received from Dialogflow HTTP processing for message: {$messageText}");
 
+                        }
+                        // ---- FIN Sección de envío de respuesta ----
                     } else {
-                        Log::info('Ignoring non-text message type: ' . ($messageData['type'] ?? 'unknown'));
+                        Log::info('Message from ' . $senderPhone . ' resulted in no actionable text for Dialogflow (e.g., unsupported interactive type or media message).');
                     }
                 }
             }
@@ -252,19 +298,7 @@ class whatsappController extends Controller
                 // --- Lógica para invocar el Handler ---
                 $finalResponse = null;
 
-                if ($detectedIntent == "ubicacion") {
-                    Log::info("Handling 'ubicacion' intent. Preparing location response.");
-                    $finalResponse = [
-                        'type' => 'location',
-                        'latitude' => self::LOCATION_LATITUDE,
-                        'longitude' => self::LOCATION_LONGITUDE,
-                        'name' => self::LOCATION_NAME,
-                        'address' => self::LOCATION_ADDRESS
-                    ];
-                } elseif ($detectedIntent == "comunicar recepcion") {
-                    Log::info("Handling 'comunicar recepcion' intent.");
-                    $finalResponse = "Claro!, puedes comunicarte con la recepción al número de telefono fijo 2418133";
-                } elseif ($detectedIntent && isset($this->intentHandlerMap[$detectedIntent])) {
+                if ($detectedIntent && isset($this->intentHandlerMap[$detectedIntent])) {
                     $handlerClass = $this->intentHandlerMap[$detectedIntent];
                     try {
                         $handlerInstance = app($handlerClass);
@@ -472,6 +506,85 @@ class whatsappController extends Controller
         }
     }
 
+    /**
+     * Envía un mensaje interactivo con botones.
+     * @param string $recipient El número de teléfono del destinatario.
+     * @param string $text El texto del cuerpo del mensaje.
+     * @param array $buttons Array de botones, cada botón es ['id' => 'payload_id', 'title' => 'Texto Botón']. Max 3.
+     * @param string|null $headerText Texto opcional para el encabezado.
+     * @return bool
+     */
+    private function sendWhatsAppInteractiveButtons(string $recipient, string $text, array $buttons, ?string $headerText = null): bool
+    {
+        if (empty($this->wsToken) || empty($this->whatsappBusinessId)) {
+            Log::error('WhatsApp credentials (token or business ID) not configured.');
+            return false;
+        }
+        if (count($buttons) > 3) {
+            Log::warning('Attempted to send more than 3 buttons. WhatsApp allows a maximum of 3.');
+            // Truncate to 3 or handle error as preferred
+            $buttons = array_slice($buttons, 0, 3);
+        }
+
+        $formattedButtons = [];
+        foreach ($buttons as $button) {
+            if (isset($button['id']) && isset($button['title'])) {
+                $formattedButtons[] = [
+                    'type' => 'reply',
+                    'reply' => [
+                        'id' => $button['id'],
+                        'title' => $button['title']
+                    ]
+                ];
+            }
+        }
+
+        if (empty($formattedButtons)) {
+            Log::error('No valid buttons provided for interactive message.');
+            return false;
+        }
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $recipient,
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'button',
+                'body' => [
+                    'text' => $text
+                ],
+                'action' => [
+                    'buttons' => $formattedButtons
+                ]
+            ]
+        ];
+
+        if ($headerText) {
+            $payload['interactive']['header'] = [
+                'type' => 'text',
+                'text' => $headerText
+            ];
+        }
+
+        try {
+            $url = "https://graph.facebook.com/v22.0/{$this->whatsappBusinessId}/messages";
+            Log::info("Sending WhatsApp INTERACTIVE BUTTONS to {$recipient}: " . json_encode($payload));
+            $response = Http::withToken($this->wsToken)->post($url, $payload);
+
+            Log::info('WhatsApp API Response Status (Interactive Buttons): ' . $response->status());
+            Log::debug('WhatsApp API Response Body (Interactive Buttons): ' . $response->body());
+
+            if (!$response->successful()) {
+                Log::error('Error sending WhatsApp INTERACTIVE BUTTONS message: ' . $response->body());
+                return false;
+            }
+            return true;
+        } catch (Exception $e) {
+            Log::error('Exception sending WhatsApp INTERACTIVE BUTTONS message: ' . $e->getMessage());
+            return false;
+        }
+    }
 
     /**
      * verificacion get del webhook de whatsapp
