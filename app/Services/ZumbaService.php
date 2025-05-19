@@ -26,9 +26,12 @@ class ZumbaService
         array $datosClienteAdicionales = []
     ): array {
         try {
-            $cliente = $this->clienteService->findOrCreateByTelefono($telefonoClienteNormalizado, $datosClienteAdicionales);
-            if (!$cliente) {
-                return ['success' => false, 'message' => 'No pudimos identificarte o registrarte en nuestro sistema.'];
+            $resultadoCliente = $this->clienteService->findOrCreateByTelefono($telefonoClienteNormalizado, $datosClienteAdicionales);
+            $cliente = $resultadoCliente['cliente'];
+            $isNewRequiringData = $resultadoCliente['is_new_requiring_data'];
+
+            if (!$cliente) { // Esto no debería pasar si findOrCreateByTelefono lanza excepción en error grave
+                return ['success' => false, 'message' => 'No pudimos identificarte o registrarte.'];
             }
             $nombreCliente = $cliente->nombre ?? 'tú';
 
@@ -71,9 +74,15 @@ class ZumbaService
             DB::commit();
 
             $nombreInstructor = $claseZumba->instructor ? $claseZumba->instructor->nombre : 'nuestro instructor';
+            $mensajeExito = "¡Perfecto, {$nombreCliente}! Te has inscrito exitosamente a la clase de Zumba del {$claseZumba->diasemama} a las " . $claseZumba->hora_inicio->format('H:i') . " con {$nombreInstructor}.";
+
+            if ($isNewRequiringData) {
+                $mensajeExito .= "\n\nNotamos que eres nuevo/a o no tenemos tu nombre completo. Para mejorar tu experiencia, cuando quieras puedes decir 'Menú', luego 'Mis Datos' para actualizar tu información.";
+            }
+
             return [
                 'success' => true,
-                'message' => "¡Perfecto, {$nombreCliente}! Te has inscrito exitosamente a la clase de Zumba del {$claseZumba->diasemama} a las " . $claseZumba->hora_inicio->format('H:i') . " con {$nombreInstructor}.",
+                'message' => $mensajeExito,
                 'data' => $inscripcion
             ];
 
