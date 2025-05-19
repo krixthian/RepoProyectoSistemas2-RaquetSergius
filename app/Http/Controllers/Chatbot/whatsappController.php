@@ -69,12 +69,12 @@ class whatsappController extends Controller
         // MAPEO MENU
         'Chatbot_Menu_Principal' => \App\Http\Controllers\Chatbot\IntentHandlers\MenuPrincipalHandler::class,
         'Chatbot_Menu_Mis_Datos' => \App\Http\Controllers\Chatbot\IntentHandlers\MenuMisDatosHandler::class,
-        'Chatbot_Menu_Info_Club' => \App\Http\Controllers\Chatbot\IntentHandlers\MenuInfoClubHandler::class, // Handler para submenú de info
+        'Chatbot_Menu_Info_Club' => \App\Http\Controllers\Chatbot\IntentHandlers\MenuInfoClubHandler::class,
         'Chatbot_Menu_Direccion' => \App\Http\Controllers\Chatbot\IntentHandlers\MenuDireccionHandler::class,
         'Chatbot_Menu_Sobre_Nosotros' => \App\Http\Controllers\Chatbot\IntentHandlers\MenuSobreNosotrosHandler::class,
         'Chatbot_Menu_Contacto_Directo' => \App\Http\Controllers\Chatbot\IntentHandlers\MenuContactoDirectoHandler::class,
 
-        // Intents para el flujo de actualizar datos (despues)
+        // Intents para el flujo de actualizar datos
         'Chatbot_MisDatos_SolicitarNombre' => \App\Http\Controllers\Chatbot\IntentHandlers\MisDatosSolicitarNombreHandler::class,
         'Chatbot_MisDatos_CapturarNombre' => \App\Http\Controllers\Chatbot\IntentHandlers\MisDatosCapturarNombreHandler::class,
         'Chatbot_MisDatos_SolicitarEmail' => \App\Http\Controllers\Chatbot\IntentHandlers\MisDatosSolicitarEmailHandler::class,
