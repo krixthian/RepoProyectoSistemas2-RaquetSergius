@@ -9,16 +9,19 @@ class InscripcionClase extends Model
 {
     use HasFactory;
 
-    protected $table = 'inscripciones_clase'; // Nombre de la tabla en la base de datos
+    protected $table = 'inscripciones_clase';
     protected $primaryKey = 'inscripcion_id';
+
+    public $timestamps = false;
+
     protected $fillable = [
         'clase_id',
         'cliente_id',
-        'fecha_inscripcion', // Ajustado a SQL
-        'estado', // Ajustado a SQL
-        'monto_pagado', // Ajustado a SQL
-        'metodo_pago', // Ajustado a SQL
-        'fecha_pago', // Ajustado a SQL
+        'fecha_inscripcion',
+        'estado',
+        'monto_pagado',
+        'metodo_pago',
+        'fecha_pago',
     ];
 
     protected $casts = [
@@ -29,7 +32,7 @@ class InscripcionClase extends Model
         'fecha_pago' => 'datetime',
     ];
 
-    public function clase()
+    public function claseZumba()
     {
         return $this->belongsTo(ClaseZumba::class, 'clase_id', 'clase_id');
     }
@@ -49,7 +52,7 @@ class InscripcionClase extends Model
         return $this->hasMany(PuntosLog::class, 'inscripcion_clase_id', 'inscripcion_id');
     }
 
-    public function canjesPremios() // Canjes aplicados a esta inscripción (ej. descuento)
+    public function canjesPremios()
     {
         return $this->hasMany(CanjePremio::class, 'inscripcion_clase_id', 'inscripcion_id');
     }

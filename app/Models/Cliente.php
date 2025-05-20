@@ -80,5 +80,9 @@ class Cliente extends Model
     {
         return $this->hasMany(CanjePremio::class, 'cliente_id', 'cliente_id');
     }
+    public function inscripcionesClase()
+    {
+        return $this->hasMany(InscripcionClase::class);
+    }
 
 }

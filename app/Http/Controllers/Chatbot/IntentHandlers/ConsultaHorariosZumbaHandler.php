@@ -16,7 +16,7 @@ class ConsultaHorariosZumbaHandler implements IntentHandlerInterface
      *
      * @param array $parameters
      * @param string $senderId
-     * @return array|string // Compatible con la interfaz modificada
+     * @return array|string 
      */
     public function handle(array $parameters, string $senderId): array|string
     {
@@ -69,7 +69,6 @@ class ConsultaHorariosZumbaHandler implements IntentHandlerInterface
             } else {
                 $caption .= "\n\nTodos nuestros horarios están habilitados actualmente.";
             }
-
 
             return [
                 'type' => 'image',

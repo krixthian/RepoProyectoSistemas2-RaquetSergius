@@ -1,5 +1,5 @@
-{{-- resources/views/admin/empleados/index.blade.php --}}
-@extends('layouts.admin') {{-- Usa tu layout principal de admin --}}
+@extends('layouts.app')
+
 
 @section('title', 'Panel de Administración') {{-- Título específico de la página --}}
 
@@ -110,7 +110,7 @@
         </div>
 
         <div class="management-options">
-            {{-- Gestión de Reservas (Ya implementada) --}}
+
             <a href="{{ route('reservas.index') }}" class="option-card">
                 <h2>Gestión de Reservas</h2>
                 <p>Administra las reservas de canchas y otros servicios.</p>
@@ -120,10 +120,9 @@
                 </div>
             </a>
 
-            {{-- Gestión de Empleados (Ruta de índice ya existe) --}}
-            {{-- Asumiendo que quieres una CRUD completo para empleados más adelante --}}
-            {{-- La ruta actual 'admin.empleados.index' solo lista. Necesitarás más rutas (create, store, edit, update, destroy) --}}
-            {{-- Por ahora, podemos enlazar a la lista existente si es útil, o marcarla como pendiente para CRUD completo --}}
+
+
+
             <a href="{{ route('admin.empleados.index') }}" class="option-card">
                 <h2>Gestión de Empleados</h2>
                 <p>Administra los usuarios empleados del sistema (roles, accesos, etc.).</p>
@@ -133,17 +132,18 @@
                 </div>
             </a>
 
-            {{-- Gestión de Clientes --}}
-            <div class="option-card">
+
+            <a href="{{ route('clientes.index') }}" class="option-card">
                 <h2>Gestión de Clientes</h2>
                 <p>Visualiza y administra la información de los clientes.</p>
-                <span class="status status-pending">Pendiente</span>
+                <span class="status ">yasta</span>
                 <div style="margin-top: 10px;">
-                    <span class="btn-manage disabled">Gestionar</span>
+                    <span class="btn-manage">Gestionar</span>
                 </div>
-            </div>
 
-            {{-- Gestión de Canchas --}}
+            </a>
+
+
             <div class="option-card">
                 <h2>Gestión de Canchas</h2>
                 <p>Administra las canchas disponibles, tipos y precios.</p>
@@ -153,7 +153,7 @@
                 </div>
             </div>
 
-            {{-- Gestión de Áreas de Zumba --}}
+
             <div class="option-card">
                 <h2>Gestión de Áreas de Zumba</h2>
                 <p>Administra las áreas para clases de Zumba, capacidades y horarios.</p>
@@ -163,7 +163,7 @@
                 </div>
             </div>
 
-            {{-- Gestión de Clases de Zumba --}}
+
             <div class="option-card">
                 <h2>Gestión de Clases de Zumba</h2>
                 <p>Define y administra las clases de Zumba, instructores y cupos.</p>
@@ -173,7 +173,7 @@
                 </div>
             </div>
 
-            {{-- Gestión de Instructores --}}
+
             <div class="option-card">
                 <h2>Gestión de Instructores</h2>
                 <p>Administra la información y especialidades de los instructores.</p>
@@ -183,7 +183,7 @@
                 </div>
             </div>
 
-            {{-- Gestión de Eventos y Torneos --}}
+
             <div class="option-card">
                 <h2>Gestión de Eventos y Torneos</h2>
                 <p>Organiza y administra eventos especiales y torneos.</p>
@@ -193,7 +193,7 @@
                 </div>
             </div>
 
-            {{-- Gestión de Membresías --}}
+
             <div class="option-card">
                 <h2>Gestión de Membresías</h2>
                 <p>Crea y administra los planes de membresía para clientes.</p>
@@ -203,7 +203,7 @@
                 </div>
             </div>
 
-            {{-- Reportes (Enlace al Dashboard existente) --}}
+
             <a href="{{ route('dashboard') }}" class="option-card">
                 <h2>Reportes y Estadísticas</h2>
                 <p>Visualiza datos importantes sobre el funcionamiento del sistema.</p>
@@ -213,9 +213,6 @@
                 </div>
             </a>
 
-            {{-- Puedes añadir más opciones aquí --}}
-            {{-- Gestión de Inventario --}}
-            {{-- Gestión Financiera --}}
 
         </div>
     </div>
