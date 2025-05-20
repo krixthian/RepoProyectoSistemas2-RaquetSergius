@@ -75,9 +75,13 @@ Route::resource('clientes', ClienteController::class);
 // --- RUTAS PROTEGIDAS  ---
 Route::middleware(['auth'])->group(function () {
 
+    Route::get('/', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
+    Route::get('/admin/empleados', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
+    Route::resource('reservas', ReservaController::class);
+
+
     Route::get('/admin/panel', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
 
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::resource('reservas', ReservaController::class);
 
@@ -91,10 +95,6 @@ Route::middleware(['auth'])->group(function () {
 });
 // ------------------------------------
 
-// Ruta raíz
-Route::get('/', function () {
-    if (auth()->check()) {
-        return redirect()->route('admin.empleados.index');
-    }
-    return redirect()->route('login');
-});
+
+Route::resource('empleados', App\Http\Controllers\EmpleadoController::class);
+Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
