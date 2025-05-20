@@ -64,7 +64,6 @@ Route::post('password/reset', [ResetPasswordController::class, 'reset'])->name('
 Route::middleware(['auth'])->group(function () {
     Route::get('/', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
     Route::get('/admin/empleados', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::resource('reservas', ReservaController::class);
 
 });
@@ -82,3 +81,5 @@ use App\Http\Controllers\ClienteController;
 
 Route::resource('clientes', ClienteController::class);
 
+Route::resource('empleados', App\Http\Controllers\EmpleadoController::class);
+Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
