@@ -30,7 +30,7 @@ class ZumbaService
             $cliente = $resultadoCliente['cliente'];
             $isNewRequiringData = $resultadoCliente['is_new_requiring_data'];
 
-            if (!$cliente) { // Esto no debería pasar si findOrCreateByTelefono lanza excepción en error grave
+            if (!$cliente) {
                 return ['success' => false, 'message' => 'No pudimos identificarte o registrarte.'];
             }
             $nombreCliente = $cliente->nombre ?? 'tú';
@@ -71,6 +71,16 @@ class ZumbaService
             $inscripcion->fecha_inscripcion = Carbon::now();
             $inscripcion->estado = 'Activa';
             $inscripcion->save();
+
+            //Actualizacion last_activity_at del cliente (CHURN)
+            if ($cliente) {
+                $cliente->last_activity_at = Carbon::now();
+                $cliente->is_churned = false; // Una nueva actividad significa que ya no está en churn
+                $cliente->save();
+                Log::info("[ZumbaService] Actualizado last_activity_at para cliente ID {$cliente->cliente_id} por inscripción a Zumba.");
+            }
+
+
             DB::commit();
 
             $nombreInstructor = $claseZumba->instructor ? $claseZumba->instructor->nombre : 'nuestro instructor';

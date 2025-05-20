@@ -9,10 +9,34 @@ class PuntosLog extends Model
 {
     use HasFactory;
 
-    protected $table = 'puntos_log'; // Nombre de la tabla en la base de datos
-    protected $primaryKey = 'log_id';
-    public $timestamps = false; // Solo existe 'fecha' en la tabla SQL
+    /**
+     * The table associated with the model.
+     * El error SQL indica 'puntos_log' (singular), la migración 'puntos_logs' (plural).
+     * Ajustar según el nombre real en tu BD. Usaré 'puntos_log' basado en el error.
+     * @var string
+     */
+    protected $table = 'puntos_log'; // o 'puntos_logs' si ese es el nombre correcto
 
+    /**
+     * The primary key associated with the table.
+     *
+     * @var string
+     */
+    protected $primaryKey = 'log_id';
+
+    /**
+     * Indicates if the model should be timestamped.
+     * La tabla tiene una columna 'fecha' con default CURRENT_TIMESTAMP,
+     * pero no parece usar las columnas 'created_at' y 'updated_at' de Eloquent.
+     * @var bool
+     */
+    public $timestamps = false; // Si no tienes created_at/updated_at estándar de Eloquent
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
         'cliente_id',
         'accion',
@@ -24,9 +48,14 @@ class PuntosLog extends Model
         'encuesta_id',
         'canje_premio_id',
         'detalle',
-        'fecha', // Incluir si se maneja manualmente
+        'fecha', // Añadido si quieres setearla manualmente, aunque tiene default
     ];
 
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
     protected $casts = [
         'cliente_id' => 'integer',
         'puntos_cambio' => 'integer',
@@ -36,32 +65,21 @@ class PuntosLog extends Model
         'inscripcion_clase_id' => 'integer',
         'encuesta_id' => 'integer',
         'canje_premio_id' => 'integer',
-        'fecha' => 'datetime',
+        'fecha' => 'datetime', // Para que Eloquent lo trate como objeto Carbon
     ];
 
-    // Relaciones
+    /**
+     * Get the cliente that owns the log.
+     */
     public function cliente()
     {
         return $this->belongsTo(Cliente::class, 'cliente_id', 'cliente_id');
     }
 
-    public function reserva()
-    {
-        return $this->belongsTo(Reserva::class, 'reserva_id', 'reserva_id');
-    }
-
-    public function inscripcionClase()
-    {
-        return $this->belongsTo(InscripcionClase::class, 'inscripcion_clase_id', 'inscripcion_id');
-    }
-
-    public function encuesta()
-    {
-        return $this->belongsTo(Encuesta::class, 'encuesta_id', 'encuesta_id');
-    }
-
-    public function canjePremio()
-    {
-        return $this->belongsTo(CanjePremio::class, 'canje_premio_id', 'canje_id');
-    }
+    // Define otras relaciones si es necesario (Reserva, InscripcionClase, etc.)
+    // Ejemplo:
+    // public function reserva()
+    // {
+    //     return $this->belongsTo(Reserva::class, 'reserva_id', 'reserva_id');
+    // }
 }

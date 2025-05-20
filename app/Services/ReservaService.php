@@ -13,11 +13,9 @@ use App\Models\Cancha;
 class ReservaService
 {
     /**
-     * Obtiene las reservas confirmadas para una fecha específica.
-     * Extraído de ReservaController::getReservasByDate
      *
-     * @param string $fechaString // Fecha en formato 'Y-m-d'
-     * @return array|null Retorna un array de reservas o null si hay error
+     * @param string $fechaString 
+     * @return array|null 
      */
     public function getReservasConfirmadasPorFecha(string $fechaString): ?array
     {
@@ -35,28 +33,25 @@ class ReservaService
     }
 
     /**
-     * Verifica si un cliente ya tiene una reserva futura (pendiente o confirmada).
-     *
-     * @param int $clienteId ID del cliente.
-     * @return bool True si tiene una reserva futura, False si no.
+     * Verifica si un cliente ya tiene una reserva futura
+     * @param int $clienteId 
+     * @return bool 
      */
     public function clienteTieneReservaFutura(int $clienteId): bool
     {
         try {
             $hoy = Carbon::today()->toDateString();
             $tieneReserva = Reserva::where('cliente_id', $clienteId)
-                ->where('fecha', '>=', $hoy) // Desde hoy en adelante
-                ->whereIn('estado', ['Pendiente', 'Confirmada']) // Solo las activas
-                ->exists(); // Devuelve true si encuentra al menos una
+                ->where('fecha', '>=', $hoy)
+                ->whereIn('estado', ['Pendiente', 'Confirmada'])
+                ->exists();
 
             Log::info("ReservaService: Check future reservation for client {$clienteId}. Result: " . ($tieneReserva ? 'Yes' : 'No'));
             return $tieneReserva;
 
         } catch (\Exception $e) {
             Log::error("ReservaService: Error checking future reservation for client {$clienteId}: " . $e->getMessage());
-            // Considera qué devolver en caso de error. False podría permitir reservar por error.
-            // True podría bloquear injustamente. Quizás lanzar una excepción o devolver null y manejarlo en el handler.
-            // Por seguridad, devolvemos true para evitar doble reserva si hay error.
+
             return true;
         }
     }
@@ -65,28 +60,27 @@ class ReservaService
      * Crea una reserva para un cliente, asignando la primera cancha disponible.
      *
      * @param int $clienteId
-     * @param string $fechaIso Dialogflow date (e.g., "2023-10-27T12:00:00-04:00")
-     * @param string $horaInicioIso Dialogflow time (e.g., "2023-10-27T14:00:00-04:00")
-     * @param array|null $duracion Dialogflow duration object (e.g., {"amount": 3600, "unit": "s"}) o null si se usa horaFinIso
-     * @param string|null $horaFinIso Dialogflow end time (e.g., "2023-10-27T15:00:00-04:00") o null si se usa duracion
-     * @param Cliente $cliente Objeto del cliente para datos adicionales (email, nombre)
-     * @return array ['success' => bool, 'message' => string, 'data' => Reserva|null]
+     * @param string $fechaIso
+     * @param string $horaInicioIso 
+     * @param array|null $duracion 
+     * @param string|null $horaFinIso 
+     * @param Cliente $cliente 
+     * @return array 
      */
     public function crearReservaEnPrimeraCanchaLibre(
         int $clienteId,
         string $fechaIso,
         string $horaInicioIso,
-        ?array $duracion, // Ejemplo: {"amount": 3600, "unit": "s"} o {"amount": 1, "unit": "h"}
+        ?array $duracion,
         ?string $horaFinIso,
         Cliente $cliente
     ): array {
         Log::info("[ReservaService] Iniciando creación de reserva en primera cancha libre.", compact('clienteId', 'fechaIso', 'horaInicioIso', 'duracion', 'horaFinIso'));
 
         try {
-            $fechaReserva = Carbon::parse($fechaIso)->startOfDay(); // Solo la fecha
-            $horaInicioObj = Carbon::parse($horaInicioIso); // Hora de inicio con su fecha original
+            $fechaReserva = Carbon::parse($fechaIso)->startOfDay();
+            $horaInicioObj = Carbon::parse($horaInicioIso);
 
-            // Combinar la fecha deseada con la hora de inicio deseada
             $fechaHoraInicioReserva = $fechaReserva->copy()->setTimeFrom($horaInicioObj);
             $horaFinCalculada = null;
 
@@ -98,10 +92,6 @@ class ReservaService
                 }
             } elseif ($duracion && isset($duracion['amount']) && isset($duracion['unit'])) {
                 try {
-                    // Convertir unidades de Dialogflow a CarbonInterval
-                    // Dialogflow V2 usa 's', 'min', 'h', 'day', 'wk', 'mo', 'yr' para 'unit'
-                    // CarbonInterval espera algo como '1 hour', '90 minutes', etc.
-                    // O directamente en segundos.
                     $seconds = 0;
                     switch ($duracion['unit']) {
                         case 's':
@@ -125,12 +115,10 @@ class ReservaService
                     return ['success' => false, 'message' => 'No se pudo entender la duración proporcionada.'];
                 }
             } else {
-                // Duración por defecto si no se especifica (ej. 1 hora)
                 $horaFinCalculada = $fechaHoraInicioReserva->copy()->addHour();
                 Log::info("[ReservaService] Usando duración por defecto de 1 hora.");
             }
 
-            // Validaciones de tiempo
             if ($fechaReserva->isPast() && !$fechaReserva->isToday()) {
                 return ['success' => false, 'message' => 'No puedes realizar reservas para fechas pasadas.'];
             }
@@ -144,9 +132,8 @@ class ReservaService
                 return ['success' => false, 'message' => "Solo puedes reservar canchas entre las {$horaMinima}:00 y las {$horaMaximaSistema}:00.\n Si tienes problemas usa el formato de 24 horas ej. '14:00'"];
             }
 
-            // Obtener todas las canchas activas y disponibles
             $canchasActivas = Cancha::where('disponible', true)
-                ->orderBy('cancha_id') // O por algún criterio de preferencia
+                ->orderBy('cancha_id')
                 ->get();
 
             if ($canchasActivas->isEmpty()) {
@@ -194,6 +181,16 @@ class ReservaService
                 'estado' => 'Confirmada',
                 'metodo_pago' => 'Efectivo'
             ]);
+
+            //Actualizacion last_activity_at del cliente (CHURN)
+            if ($cliente) {
+                $cliente->last_activity_at = Carbon::now();
+                $cliente->is_churned = false; // Una nueva actividad significa que ya no está en churn
+                $cliente->save();
+                Log::info("[ReservaService] Actualizado last_activity_at para cliente ID {$cliente->cliente_id} por reserva.");
+            }
+
+
             DB::commit();
             Log::info("[ReservaService] Reserva creada exitosamente.", ['reserva_id' => $nuevaReserva->getKey()]); // Usar getKey() para la PK
 
@@ -220,10 +217,9 @@ class ReservaService
 
 
     /**
-     * Busca la *única* reserva futura activa (Pendiente/Confirmada) para un cliente.
      *
      * @param int $clienteId
-     * @return Reserva|null Retorna el modelo Reserva si encuentra una única, null si no encuentra ninguna, o si encuentra múltiples (para evitar ambigüedad).
+     * @return Reserva|null    
      */
     //BUSCAR RESERVAR PROXIMA
     public function findUnicaReservaFutura(int $clienteId): ?Reserva
@@ -234,55 +230,52 @@ class ReservaService
             $reservasFuturas = Reserva::where('cliente_id', $clienteId)
                 ->where('fecha', '>=', $hoy)
                 ->whereIn('estado', ['Pendiente', 'Confirmada'])
-                ->orderBy('fecha', 'asc') // Opcional: tomar la más próxima si hay varias?
+                ->orderBy('fecha', 'asc')
                 ->get();
 
-            // Verifica si se encontró exactamente una reserva
+
             if ($reservasFuturas->count() === 1) {
                 Log::info("ReservaService: Found one future reservation.");
                 return $reservasFuturas->first();
             } elseif ($reservasFuturas->count() > 1) {
                 Log::warning("ReservaService: Found multiple ({$reservasFuturas->count()}) future reservations for client {$clienteId}. Cannot uniquely identify which one to cancel via bot.");
-                // Podrías devolver las reservas para que el handler las liste, o null para indicar ambigüedad.
-                // Devolver null es más simple para el flujo actual del bot.
-                return null; // Indica ambigüedad o más de una reserva
+
+                return null;
             } else {
                 Log::info("ReservaService: No future reservations found for client {$clienteId}.");
-                return null; // No encontró ninguna
+                return null;
             }
 
         } catch (\Exception $e) {
             Log::error("ReservaService: Error finding single future reservation for client {$clienteId}: " . $e->getMessage());
-            return null; // Error durante la búsqueda
+            return null;
         }
     }
 
 
 
     /**
-     * Cambia el estado de una reserva a 'Cancelada'.
-     * Incluye validación básica de tiempo de cancelación (ej. 2 horas antes).
      *
-     * @param Reserva $reserva El objeto Reserva a cancelar.
-     * @param int $horasAntelacionMinimas Mínimo de horas antes para poder cancelar.
-     * @return bool True si la cancelación fue exitosa, False en caso contrario.
+     * @param Reserva $reserva
+     * @param int $horasAntelacionMinimas
+     * @return bool
      */
     public function cancelarReserva(Reserva $reserva, int $horasAntelacionMinimas = 2): bool
     {
         Log::info("ReservaService: Attempting to cancel reservation ID: {$reserva->reserva_id}");
         try {
-            // Combina fecha y hora_inicio para obtener el momento exacto de inicio
+
             $fechaHoraInicioReserva = $reserva->fecha->copy()->setTimeFromTimeString($reserva->hora_inicio);
             $ahora = Carbon::now();
 
-            // --- Validación de Política de Cancelación ---
+            // --- Validación  ---
             if ($ahora->gte($fechaHoraInicioReserva)) {
                 Log::warning("ReservaService: Attempt to cancel reservation ID {$reserva->reserva_id} that has already started or passed.");
-                return false; // Ya pasó o está en curso
+                return false;
             }
             if ($ahora->diffInHours($fechaHoraInicioReserva) < $horasAntelacionMinimas) {
                 Log::warning("ReservaService: Attempt to cancel reservation ID {$reserva->reserva_id} within the minimum notice period ({$horasAntelacionMinimas} hours).");
-                return false; // Demasiado tarde para cancelar
+                return false;
             }
             // --- Fin Validación ---
 
@@ -290,16 +283,16 @@ class ReservaService
             // Verifica si ya está cancelada
             if ($reserva->estado === 'Cancelada') {
                 Log::info("ReservaService: Reservation ID {$reserva->reserva_id} is already cancelled.");
-                return true; // Ya estaba cancelada, considera éxito
+                return true; // Ya estaba cancelada
             }
 
             // Actualiza el estado
             $reserva->estado = 'Cancelada';
-            $success = $reserva->save(); // Guarda los cambios en la BD
+            $success = $reserva->save();
 
             if ($success) {
                 Log::info("ReservaService: Reservation ID {$reserva->reserva_id} cancelled successfully.");
-                // TODO: Aquí podrías disparar un evento, enviar notificación, etc.
+                // TODO: disparar un evento enviar noti
             } else {
                 Log::error("ReservaService: Failed to save cancellation for reservation ID {$reserva->reserva_id}.");
             }

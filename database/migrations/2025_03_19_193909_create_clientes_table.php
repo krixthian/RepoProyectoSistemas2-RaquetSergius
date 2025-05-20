@@ -22,9 +22,7 @@ return new class extends Migration {
             $table->timestamp('last_activity_at')->nullable(); // timestamp
             $table->boolean('is_churned')->default(false); // boolean NOT NULL DEFAULT false
             $table->integer('puntos')->default(0); // int NOT NULL DEFAULT 0
-            $table->integer('streak_semanal_actual')->default(0); // int NOT NULL DEFAULT 0
-            $table->integer('streak_semanal_maxima')->default(0); // int NOT NULL DEFAULT 0
-            $table->integer('ultima_semana_actividad')->nullable(); // int
+
 
 
             $table->timestamps();
