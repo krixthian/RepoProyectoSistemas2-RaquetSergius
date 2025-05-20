@@ -4,16 +4,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany; // Importar
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Cliente extends Model
 {
     use HasFactory;
 
 
-    protected $table = 'clientes'; // Asumiendo que la tabla se llama así
-    protected $primaryKey = 'cliente_id'; // Clave primaria correcta
-    public $incrementing = true; // Asegúrate si es autoincremental
+    protected $table = 'clientes';
+    protected $primaryKey = 'cliente_id';
+    public $incrementing = true;
     protected $keyType = 'int';
     public $timestamps = false;
 
@@ -23,25 +23,19 @@ class Cliente extends Model
         'email',
         'cliente_frecuente',
         'fecha_registro',
-        // Nuevas columnas
+
         'last_activity_at',
         'is_churned',
         'puntos',
-        'streak_semanal_actual',
-        'streak_semanal_maxima',
-        'ultima_semana_actividad',
     ];
 
     protected $casts = [
         'cliente_frecuente' => 'boolean',
         'fecha_registro' => 'date',
-        // Casts para nuevas columnas
+
         'last_activity_at' => 'datetime',
         'is_churned' => 'boolean',
         'puntos' => 'integer',
-        'streak_semanal_actual' => 'integer',
-        'streak_semanal_maxima' => 'integer',
-        'ultima_semana_actividad' => 'integer',
     ];
 
 
@@ -61,7 +55,7 @@ class Cliente extends Model
         return $this->hasMany(Notificacion::class, 'cliente_id', 'cliente_id');
     }
 
-    public function equiposCapitan() // Equipos donde es capitán
+    public function equiposCapitan()
     {
         return $this->hasMany(Equipo::class, 'capitan_id', 'cliente_id');
     }

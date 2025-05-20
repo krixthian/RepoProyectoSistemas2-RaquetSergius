@@ -19,6 +19,7 @@ use App\Http\Controllers\IndexEmpleadoController;
 
 use App\Http\Controllers\ClienteController;
 
+use App\Http\Controllers\Admin\ChurnController;
 
 Route::get('/login', function () {
     if (auth()->check()) {
@@ -68,6 +69,7 @@ Route::post('password/reset', [ResetPasswordController::class, 'reset'])->name('
 Route::resource('torneos', TorneoController::class);
 Route::resource('equipos', EquipoController::class);
 
+Route::get('/admin/churn-analisis', [ChurnController::class, 'index'])->name('admin.churn.index');
 
 Route::resource('clientes', ClienteController::class);
 // ------------------------------------
