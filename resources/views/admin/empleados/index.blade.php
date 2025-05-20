@@ -123,10 +123,10 @@
 
 
 
-            <a href="{{ route('admin.empleados.index') }}" class="option-card">
+            <a href="/empleados" class="option-card">
                 <h2>Gestión de Empleados</h2>
                 <p>Administra los usuarios empleados del sistema (roles, accesos, etc.).</p>
-                <span class="status status-pending">Listado Implementado (CRUD Pendiente)</span>
+                <span class="status status-implemented">Implementado</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Ver Lista</span>
                 </div>
@@ -136,7 +136,7 @@
             <a href="{{ route('clientes.index') }}" class="option-card">
                 <h2>Gestión de Clientes</h2>
                 <p>Visualiza y administra la información de los clientes.</p>
-                <span class="status ">yasta</span>
+                <span class="status status-implemented">Implementado</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Gestionar</span>
                 </div>
@@ -145,8 +145,8 @@
 
 
             <div class="option-card">
-                <h2>Gestión de Canchas</h2>
-                <p>Administra las canchas disponibles, tipos y precios.</p>
+                <h2>Gestión de Premios</h2>
+                <p>Administrar los premios disponibles para canjear.</p>
                 <span class="status status-pending">Pendiente</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage disabled">Gestionar</span>
@@ -183,34 +183,38 @@
                 </div>
             </div>
 
+            <a href="/torneos" class="option-card">
 
-            <div class="option-card">
                 <h2>Gestión de Eventos y Torneos</h2>
                 <p>Organiza y administra eventos especiales y torneos.</p>
-                <span class="status status-pending">Pendiente</span>
+                <span class="status status-implemented">Implementado</span>
                 <div style="margin-top: 10px;">
-                    <span class="btn-manage disabled">Gestionar</span>
+                    <span class="btn-manage">Gestionar</span>
                 </div>
-            </div>
 
-
-            <div class="option-card">
-                <h2>Gestión de Membresías</h2>
-                <p>Crea y administra los planes de membresía para clientes.</p>
-                <span class="status status-pending">Pendiente</span>
-                <div style="margin-top: 10px;">
-                    <span class="btn-manage disabled">Gestionar</span>
-                </div>
-            </div>
-
+            </a>
 
             <a href="{{ route('dashboard') }}" class="option-card">
+
                 <h2>Reportes y Estadísticas</h2>
                 <p>Visualiza datos importantes sobre el funcionamiento del sistema.</p>
-                <span class="status status-implemented">Dashboard Implementado</span>
+                <span class="status status-implemented">Implementado</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Ver Dashboard</span>
                 </div>
+
+            </a>
+
+
+            <a href="{{ route('admin.churn.index') }}" class="option-card">
+
+                <h2>Tasa de abandono (Chrun)</h2>
+                <p>Visualiza analisis de Churn</p>
+                <span class="status status-implemented">Implementado</span>
+                <div style="margin-top: 10px;">
+                    <span class="btn-manage">Ver</span>
+                </div>
+
             </a>
 
 

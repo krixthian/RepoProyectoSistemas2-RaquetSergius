@@ -49,7 +49,7 @@ Route::post('/login', function (Request $request) {
         Log::info('Auth check after session regenerate: ' . (Auth::check() ? 'Authenticated, User ID: ' . Auth::id() : 'Not Authenticated'));
 
 
-        return redirect()->intended(route('admin.panel'));
+        return redirect()->intended(route('admin.empleados.index'));
     }
 
     Log::warning('Login failed for user: ' . $request->usuario);
