@@ -67,6 +67,8 @@ Route::resource('equipos', EquipoController::class);
 // -------------------------------------
 
 Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+Route::resource('reservas', ReservaController::class);
+
 
 // --- RUTAS PROTEGIDAS (REQUIEREN LOGIN) ---
 
@@ -83,7 +85,6 @@ Route::middleware(['auth'])->group(function () { // Asegúrate de que el guard '
     })->name('logout');
 
     // Rutas para el CRUD de Reservas (usando ReservaController)
-    Route::resource('reservas', ReservaController::class);
 
     // Aquí puedes añadir más rutas que requieran login
     // Ejemplo: Route::get('/mi-perfil', [ProfileController::class, 'show'])->name('profile.show');

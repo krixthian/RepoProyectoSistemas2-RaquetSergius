@@ -33,13 +33,11 @@
                 @enderror
             </div>
 
-            {{-- Campo para editar el Torneo Principal Asignado --}}
             <div class="mb-3">
                 <label for="torneo_principal_id" class="form-label">Torneo Principal Asignado</label>
                 <select class="form-select @error('torneo_principal_id') is-invalid @enderror" id="torneo_principal_id" name="torneo_principal_id" required>
                     <option value="">Seleccione un Torneo</option>
                     @foreach($torneos as $torneo)
-                        {{-- Usamos old() para el caso de error de validación, sino el valor actual del equipo --}}
                         <option value="{{ $torneo->torneo_id }}" {{ old('torneo_principal_id', $equipo->torneo_id) == $torneo->torneo_id ? 'selected' : '' }}>
                             {{ $torneo->deporte }} - {{ $torneo->categoria }} (ID: {{ $torneo->torneo_id }})
                         </option>
