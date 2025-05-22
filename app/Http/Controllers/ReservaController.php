@@ -11,15 +11,26 @@ use Illuminate\Support\Facades\Log;
 
 class ReservaController extends Controller
 {
-    public function index()
-    {
-        $reservas = Reserva::with(['cliente', 'cancha'])
-                           ->orderBy('fecha', 'desc')
-                           ->orderBy('hora_inicio', 'desc')
-                           ->get();
+    public function index(Request $request)
+{
+    $query = Reserva::with(['cliente', 'cancha'])
+                    ->orderBy('fecha', 'desc')
+                    ->orderBy('hora_inicio', 'desc');
 
-        return view('reservas.index', compact('reservas'));
+    // Filtro por nombre de cliente (si viene en el request)
+    if ($request->filled('cliente_nombre')) {
+        $nombre = $request->cliente_nombre;
+
+        $query->whereHas('cliente', function ($q) use ($nombre) {
+            $q->where('nombre', 'like', '%' . $nombre . '%');
+        });
     }
+
+    $reservas = $query->get();
+
+    return view('reservas.index', compact('reservas'));
+}
+
 
     public function create()
     {
