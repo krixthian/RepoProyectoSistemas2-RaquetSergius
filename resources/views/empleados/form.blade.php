@@ -17,7 +17,7 @@
 
 <div class="mb-3">
     <label for="telefono" class="form-label fw-bold">Teléfono</label>
-    <input type="text" name="telefono" class="form-control" value="{{ old('telefono', $empleado->telefono ?? '') }}">
+    <input type="number" name="telefono" class="form-control" mmax="8" value="{{ old('telefono', $empleado->telefono ?? '') }}">
 </div>
 
 <div class="mb-3">
@@ -36,7 +36,7 @@
 @if (!isset($empleado))
 <div class="mb-3">
     <label for="contrasena" class="form-label fw-bold">Contraseña</label>
-    <input type="password" name="contrasena" class="form-control" required>
+    <input type="password" name="contrasena" min="6" max="15" class="form-control" required>
 </div>
 @endif
 
