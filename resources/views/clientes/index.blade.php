@@ -1,38 +1,30 @@
 @extends('layouts.app')
 
 @section('content')
-<style>
-    body {
-        background-color: #f5f5dc; /* beige */
-    }
-    .card {
-        background-color: #e0f7fa; /* celeste piscina */
-        border-radius: 20px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    }
-    .btn-custom {
-        background-color: #00bcd4; /* celeste piscina */
-        color: white;
-    }
-    .btn-custom:hover {
-        background-color: #0097a7;
-    }
-    .table th {
-        background-color: #b2ebf2;
-    }
-</style>
+@push('styles')
+<link href="{{ asset('css/styleEmpleados.css') }}" rel="stylesheet">
+@endpush
 
 <div class="container mt-5">
     <div class="card p-4">
-        <h2 class="mb-4 text-center">Gestión de Clientes</h2>
+        <header class="page-header">
+    <div class="header-info">
+        <h1><i class="fas fa-user-friends me-2"></i>Gestión de Clientes</h1>
+    </div>
+    <a href="{{ route('clientes.create') }}" class="btn-primary btn-new-employee">
+        <i class="fas fa-plus-circle me-2"></i>Nuevo Cliente
+    </a>
+</header>
+            <div class="card-header">
+                <h2><i class="fas fa-list-ol me-2"></i>Listado Completo</h2>
+            </div>
+@if(session('success'))
+    <div class="alert alert-success mt-3">{{ session('success') }}</div>
+@endif
 
-        @if(session('success'))
-            <div class="alert alert-success">{{ session('success') }}</div>
-        @endif
-
-        <a href="{{ route('clientes.create') }}" class="btn btn-custom mb-3">+ Nuevo Cliente</a>
 
         <table class="table table-hover table-bordered">
+            <table class="employees-table">
             <thead>
                 <tr>
                     <th>Nombre</th>
@@ -66,6 +58,7 @@
                 </tr>
                 @endforelse
             </tbody>
+            </table>
         </table>
     </div>
 </div>
