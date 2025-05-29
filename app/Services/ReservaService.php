@@ -103,6 +103,9 @@ class ReservaService
                         case 'h':
                             $seconds = $duracion['amount'] * 3600;
                             break;
+                        case 'hora':
+                            $seconds = $duracion['amount'] * 3600;
+                            break;
                         default:
                             return ['success' => false, 'message' => 'La unidad de duración no es válida. Por favor, usa horas o minutos.'];
                     }
@@ -188,6 +191,8 @@ class ReservaService
                 $cliente->is_churned = false; // Una nueva actividad significa que ya no está en churn
                 $cliente->save();
                 Log::info("[ReservaService] Actualizado last_activity_at para cliente ID {$cliente->cliente_id} por reserva.");
+            } else {
+                Log::warning("[ReservaService] No se pudo actualizar last_activity_at: objeto cliente no proporcionado.");
             }
 
 
@@ -197,7 +202,7 @@ class ReservaService
 
             return [
                 'success' => true,
-                'message' => "¡Tu reserva para la cancha '{$canchaAsignada->nombre_cancha}' el {$fechaReserva->isoFormat('dddd D [de] MMMM')} de {$fechaHoraInicioReserva->format('H:i')} a {$horaFinCalculada->format('H:i')} ha sido confirmada! El monto es de " . number_format($montoReserva, 2) . " Bs.",
+                'message' => "¡Tu reserva de cancha #{$canchaAsignada->cancha_id} de wally  el {$fechaReserva->locale('es')->isoFormat('dddd D [de] MMMM')} de {$fechaHoraInicioReserva->format('H:i')} a {$horaFinCalculada->format('H:i')} ha sido confirmada! El monto es de " . number_format($montoReserva, 2) . " Bs., Te esperamos!",
                 'data' => $nuevaReserva
             ];
 
@@ -252,7 +257,25 @@ class ReservaService
         }
     }
 
+    public function getReservasActivasFuturasPorCliente(int $clienteId)
+    {
+        $hoy = Carbon::today()->toDateString();
+        $ahora = Carbon::now()->format('H:i:s');
 
+        return Reserva::where('cliente_id', $clienteId)
+            ->where('estado', 'Confirmada') // O el estado que uses para reservas válidas
+            ->where(function ($query) use ($hoy, $ahora) {
+                $query->where('fecha', '>', $hoy)
+                    ->orWhere(function ($query) use ($hoy, $ahora) {
+                        $query->where('fecha', '=', $hoy)
+                            ->where('hora_fin', '>', $ahora);
+                    });
+            })
+            ->with('cancha') // Para mostrar el nombre de la cancha
+            ->orderBy('fecha', 'asc')
+            ->orderBy('hora_inicio', 'asc')
+            ->get();
+    }
 
     /**
      *
@@ -301,6 +324,21 @@ class ReservaService
         } catch (\Exception $e) {
             Log::error("ReservaService: Error cancelling reservation ID {$reserva->reserva_id}: " . $e->getMessage());
             return false;
+        }
+    }
+
+    public function findReservaById(int $reservaId): ?Reserva
+    {
+        try {
+            $reserva = Reserva::where('reserva_id', $reservaId)->first();
+            if (!$reserva) {
+                Log::warning("ReservaService: No reservation found with ID {$reservaId}");
+                return null;
+            }
+            return $reserva;
+        } catch (\Exception $e) {
+            Log::error("ReservaService: Error finding reservation by ID {$reservaId}: " . $e->getMessage());
+            return null;
         }
     }
 }

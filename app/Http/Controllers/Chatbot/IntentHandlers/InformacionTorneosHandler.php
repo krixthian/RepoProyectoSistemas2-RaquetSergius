@@ -10,7 +10,7 @@ use Carbon\Carbon;
 
 class InformacionTorneosHandler implements IntentHandlerInterface
 {
-    public function handle(array $parameters, string $senderId): string
+    public function handle(array $parameters, string $senderId, ?string $action = null): string
     {
         Log::info('Executing InformacionTorneosHandler');
         $torneos = Torneo::whereIn('estado', ['programado', 'en curso'])

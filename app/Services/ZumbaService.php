@@ -5,10 +5,10 @@ namespace App\Services;
 use App\Models\Cliente;
 use App\Models\ClaseZumba;
 use App\Models\InscripcionClase;
-use App\Services\ClienteService;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
+use Exception;
+use App\Http\Controllers\Chatbot\IntentHandlers\InscribirClaseZumbaHandler;
 
 class ZumbaService
 {
@@ -19,92 +19,145 @@ class ZumbaService
         $this->clienteService = $clienteService;
     }
 
-    public function inscribirClienteAClase(
-        string $telefonoClienteNormalizado,
-        string $diaSemanaEntrada,
-        string $horaInicioClase,
-        array $datosClienteAdicionales = []
-    ): array {
+    /**
+     * Inscribe un cliente a una clase de Zumba específica en una fecha dada.
+     *
+     * @param string $telefonoClienteNormalizado
+     * @param int $claseId
+     * @param string $fechaClase (YYYY-MM-DD)
+     * @param array $datosClienteAdicionales (ej. ['nombre_perfil_whatsapp' => '...'])
+     * @return array ['success' => bool, 'message' => string]
+     */
+    public function inscribirClienteAClasePorId(string $telefonoClienteNormalizado, int $claseId, string $fechaClase, array $datosClienteAdicionales = []): array
+    {
+        Log::info("[ZumbaService] Intentando inscribir cliente {$telefonoClienteNormalizado} a clase ID {$claseId} para fecha {$fechaClase}");
+
+        $resultadoCliente = $this->clienteService->findOrCreateByTelefono($telefonoClienteNormalizado, $datosClienteAdicionales);
+        $cliente = $resultadoCliente['cliente'];
+
+        if (!$cliente) {
+            return ['success' => false, 'message' => 'No se pudo identificar o crear tu perfil de cliente.'];
+        }
+        // Si es nuevo y no se pudo obtener nombre, pedirlo en el handler.
+        if ($resultadoCliente['is_new_requiring_data']) {
+            return ['success' => false, 'message' => "Necesitamos tu nombre para completar la inscripción. El handler debería pedirlo."];
+        }
+
+
+        $clase = ClaseZumba::find($claseId);
+        if (!$clase) {
+            return ['success' => false, 'message' => "La clase con ID {$claseId} no existe."];
+        }
+        if (!$clase->habilitado) {
+            return ['success' => false, 'message' => "La clase ID {$claseId} ({$clase->diasemama} {$clase->hora_inicio->format('H:i')}) no está habilitada en este momento."];
+        }
+
+        // Validar fecha de la clase (no pasada, no muy lejana)
         try {
-            $resultadoCliente = $this->clienteService->findOrCreateByTelefono($telefonoClienteNormalizado, $datosClienteAdicionales);
-            $cliente = $resultadoCliente['cliente'];
-            $isNewRequiringData = $resultadoCliente['is_new_requiring_data'];
+            $fechaClaseCarbon = Carbon::parse($fechaClase)->startOfDay();
+            $hoy = Carbon::today();
+            $fechaLimite = $hoy->copy()->addDays(InscribirClaseZumbaHandler::MAX_DIAS_ANTICIPACION_INSCRIPCION); // Usar constante del handler
 
-            if (!$cliente) {
-                return ['success' => false, 'message' => 'No pudimos identificarte o registrarte.'];
+            if ($fechaClaseCarbon->isPast() && !$fechaClaseCarbon->isToday()) {
+                return ['success' => false, 'message' => "No puedes inscribirte a una clase en una fecha pasada ({$fechaClaseCarbon->isoFormat('D MMM')})."];
             }
-            $nombreCliente = $cliente->nombre ?? 'tú';
-
-
-            $claseZumba = ClaseZumba::where('diasemama', $diaSemanaEntrada)
-                ->whereTime('hora_inicio', '=', $horaInicioClase)
-                ->where('habilitado', true)
-                ->first();
-
-            if (!$claseZumba) {
-                $horaDisplay = Carbon::parse($horaInicioClase)->format('H:i');
-                return ['success' => false, 'message' => "No encontré una clase de Zumba activa para el {$diaSemanaEntrada} a las {$horaDisplay}. ¿Quieres intentar con otro horario?"];
+            if ($fechaClaseCarbon->gt($fechaLimite)) {
+                return ['success' => false, 'message' => "Solo puedes inscribirte con " . InscribirClaseZumbaHandler::MAX_DIAS_ANTICIPACION_INSCRIPCION . " días de anticipación (hasta el {$fechaLimite->isoFormat('D MMM')})."];
+            }
+            // Validar que la fecha seleccionada corresponda al diaSemama de la clase
+            if (ucfirst($fechaClaseCarbon->locale('es_ES')->dayName) !== $clase->diasemama) {
+                return ['success' => false, 'message' => "La fecha {$fechaClaseCarbon->isoFormat('D MMM')} no corresponde al día {$clase->diasemama} de la clase ID {$claseId}."];
             }
 
+        } catch (Exception $e) {
+            return ['success' => false, 'message' => "La fecha proporcionada ({$fechaClase}) no es válida."];
+        }
 
-            $inscripcionesActuales = InscripcionClase::where('clase_id', $claseZumba->clase_id)
-                ->where('estado', 'Activa')
-                ->count();
 
-            if ($inscripcionesActuales >= $claseZumba->cupo_maximo) {
-                return ['success' => false, 'message' => "Lo siento, la clase de Zumba del {$claseZumba->diasemama} a las " . $claseZumba->hora_inicio->format('H:i') . " ya está llena."];
-            }
+        // Validar si ya está inscrito en esa clase y fecha específica
+        $yaInscrito = InscripcionClase::where('cliente_id', $cliente->cliente_id)
+            ->where('clase_id', $claseId)
+            ->where('fecha_clase', $fechaClaseCarbon->toDateString())
+            ->where('estado', 'Activa') // Considerar también otros estados si no debe reinscribirse
+            ->exists();
 
-            $yaInscrito = InscripcionClase::where('cliente_id', $cliente->cliente_id)
-                ->where('clase_id', $claseZumba->clase_id)
-                ->where('estado', 'Activa')
-                ->exists();
+        if ($yaInscrito) {
+            return ['success' => false, 'message' => "Ya estás inscrito a la clase ID {$claseId} para el {$fechaClaseCarbon->locale('es')->isoFormat('D MMM')}."];
+        }
 
-            if ($yaInscrito) {
-                return ['success' => false, 'message' => "Ya te encuentras inscrito/a en la clase de Zumba del {$claseZumba->diasemama} a las " . $claseZumba->hora_inicio->format('H:i') . "."];
-            }
+        // Validar cupo (si tienes un campo 'cupo_maximo' y 'inscritos_actuales' en ClaseZumba o AreaZumba)
+        // if ($clase->inscritos_actuales >= $clase->cupo_maximo) {
+        //    return ['success' => false, 'message' => "Lo sentimos, la clase ID {$claseId} para el {$fechaClaseCarbon->locale('es')->isoFormat('D MMM')} ya no tiene cupos."];
+        // }
 
-            DB::beginTransaction();
-            $inscripcion = new InscripcionClase();
-            $inscripcion->cliente_id = $cliente->cliente_id;
-            $inscripcion->clase_id = $claseZumba->clase_id;
-            $inscripcion->fecha_inscripcion = Carbon::now();
-            $inscripcion->estado = 'Activa';
+        try {
+            InscripcionClase::create([
+                'cliente_id' => $cliente->cliente_id,
+                'clase_id' => $claseId,
+                'fecha_inscripcion' => Carbon::now(),
+                'fecha_clase' => $fechaClaseCarbon->toDateString(),
+                'hora_inicio_clase' => $clase->hora_inicio, // Guardar la hora específica
+                'monto_pagado' => $clase->precio, // Asumir que se paga el precio de la clase
+                'metodo_pago' => 'Chatbot', // O el método que definas
+                'estado' => 'Activa', // O 'Pendiente de Pago' si tienes ese flujo
+            ]);
+
+            // Opcional: Actualizar contador de inscritos en la clase si lo manejas así
+            // $clase->increment('inscritos_actuales');
+
+            Log::info("[ZumbaService] Cliente {$cliente->cliente_id} inscrito a clase ID {$claseId} para fecha {$fechaClaseCarbon->toDateString()}");
+            return ['success' => true, 'message' => "¡Inscripción exitosa a la clase ID {$claseId} ({$clase->diasemama} {$clase->hora_inicio->format('H:i')}) para el {$fechaClaseCarbon->locale('es')->isoFormat('D MMM')}!"];
+        } catch (Exception $e) {
+            Log::error("[ZumbaService] Error al crear inscripción: " . $e->getMessage());
+            return ['success' => false, 'message' => "No se pudo completar tu inscripción a la clase ID {$claseId} debido a un error."];
+        }
+    }
+
+    /**
+     * Cancela la inscripción de un cliente a una clase.
+     *
+     * @param int $clienteId
+     * @param int $inscripcionId El ID de la tabla inscripciones_clase
+     * @param int $minHorasAnticipacion Mínimo de horas antes para poder cancelar
+     * @return array ['success' => bool, 'message' => string]
+     */
+    public function cancelarInscripcionCliente(int $clienteId, int $inscripcionId, int $minHorasAnticipacion = 2): array
+    {
+        $inscripcion = InscripcionClase::where('inscripcion_id', $inscripcionId)
+            ->where('cliente_id', $clienteId)
+            ->where('estado', 'Activa')
+            ->first();
+
+        if (!$inscripcion) {
+            return ['success' => false, 'message' => "No se encontró una inscripción activa con ID {$inscripcionId} para ti."];
+        }
+
+        // Determinar la fecha y hora de inicio de la clase desde la inscripción
+        $fechaHoraClase = Carbon::parse($inscripcion->fecha_clase . ' ' . $inscripcion->hora_inicio_clase);
+
+        if ($fechaHoraClase->isPast()) {
+            return ['success' => false, 'message' => "No puedes cancelar una clase que ya pasó ({$fechaHoraClase->isoFormat('D MMM H:mm')})."];
+        }
+
+        if (Carbon::now()->diffInHours($fechaHoraClase, false) < $minHorasAnticipacion) {
+            return ['success' => false, 'message' => "No puedes cancelar la clase ({$fechaHoraClase->isoFormat('D MMM H:mm')}) con menos de {$minHorasAnticipacion} horas de anticipación. Contacta a recepción."];
+        }
+
+        try {
+            $inscripcion->estado = 'Cancelada';
+            $inscripcion->fecha_cancelacion = Carbon::now();
             $inscripcion->save();
 
-            //Actualizacion last_activity_at del cliente (CHURN)
-            if ($cliente) {
-                $cliente->last_activity_at = Carbon::now();
-                $cliente->is_churned = false; // Una nueva actividad significa que ya no está en churn
-                $cliente->save();
-                Log::info("[ZumbaService] Actualizado last_activity_at para cliente ID {$cliente->cliente_id} por inscripción a Zumba.");
-            }
+            // Opcional: Decrementar contador de inscritos en la clase si lo manejas así
+            // if ($inscripcion->claseZumba) {
+            //    $inscripcion->claseZumba->decrement('inscritos_actuales');
+            // }
 
-
-            DB::commit();
-
-            $nombreInstructor = $claseZumba->instructor ? $claseZumba->instructor->nombre : 'nuestro instructor';
-            $mensajeExito = "¡Perfecto, {$nombreCliente}! Te has inscrito exitosamente a la clase de Zumba del {$claseZumba->diasemama} a las " . $claseZumba->hora_inicio->format('H:i') . " con {$nombreInstructor}.";
-
-            if ($isNewRequiringData) {
-                $mensajeExito .= "\n\nNotamos que eres nuevo/a o no tenemos tu nombre completo. Para mejorar tu experiencia, cuando quieras puedes decir 'Menú', luego 'Mis Datos' para actualizar tu información.";
-            }
-
-            return [
-                'success' => true,
-                'message' => $mensajeExito,
-                'data' => $inscripcion
-            ];
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error("Error en ZumbaService@inscribirClienteAClase: " . $e->getMessage(), [
-                'telefono' => $telefonoClienteNormalizado,
-                'dia' => $diaSemanaEntrada,
-                'hora' => $horaInicioClase,
-                'trace' => $e->getTraceAsString()
-            ]);
-            return ['success' => false, 'message' => 'Hubo un problema técnico al procesar tu inscripción. Por favor, intenta nuevamente más tarde.'];
+            Log::info("[ZumbaService] Inscripción ID {$inscripcionId} para cliente {$clienteId} cancelada.");
+            return ['success' => true, 'message' => "Tu inscripción a la clase del {$fechaHoraClase->isoFormat('dddd D MMM [a las] H:mm')} ha sido cancelada."];
+        } catch (Exception $e) {
+            Log::error("[ZumbaService] Error al cancelar inscripción ID {$inscripcionId}: " . $e->getMessage());
+            return ['success' => false, 'message' => "No se pudo cancelar tu inscripción debido a un error."];
         }
     }
 }

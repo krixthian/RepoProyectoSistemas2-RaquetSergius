@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Chatbot\IntentHandlers;
 
-use App\Chatbot\IntentHandlerInterface;
+use App\Chatbot\IntentHandlerInterface; //
 use App\Services\ClienteService;
 use Illuminate\Support\Facades\Log;
 
@@ -15,52 +15,67 @@ class MenuMisDatosHandler implements IntentHandlerInterface
         $this->clienteService = $clienteService;
     }
 
-    private function normalizePhoneNumber(string $phoneNumber): string
+    // El senderId ya viene normalizado desde whatsappController
+    public function handle(array $parameters, string $senderId, ?string $action = null): array
     {
-        if (strpos($phoneNumber, 'whatsapp:+') === 0) {
-            return substr($phoneNumber, strlen('whatsapp:+'));
-        }
-        return preg_replace('/[^0-9+]/', '', $phoneNumber);
-    }
+        Log::info("[MenuMisDatosHandler] Executing for senderId: {$senderId}, Action: " . ($action ?? 'N/A'));
+        $cliente = $this->clienteService->findClienteByTelefono($senderId);
 
-    public function handle(array $parameters, string $senderId): array
-    {
-        $telefonoNormalizado = $this->normalizePhoneNumber($senderId);
-        $cliente = $this->clienteService->findClienteByTelefono($telefonoNormalizado);
+        $messagesToSend = [];
+        $outputContextsToSetActive = [];
 
         if (!$cliente) {
-            // Esto podría pasar si el cliente envió "menu" pero no está en la BD aún.
-            // Podríamos intentar crearlo aquí o guiarlo.
-            // Por ahora, un mensaje simple.
-            return ['fulfillmentText' => "Parece que aún no estás registrado. Puedes intentar una acción como reservar o inscribirte para registrarte."];
-        }
-
-        $responseText = "Aquí están tus datos:\n";
-        $responseText .= "📞 Teléfono: " . ($cliente->telefono ?? 'No registrado') . "\n";
-        $responseText .= "👤 Nombre: " . ($cliente->nombre ?? 'No registrado') . "\n";
-        $responseText .= "📧 Email: " . ($cliente->email ?? 'No registrado');
-
-        // Preguntar si quiere actualizar si falta el nombre
-        if (empty($cliente->nombre)) {
-            return [
-                'type' => 'interactive_buttons',
-                'text' => $responseText . "\n\nNotamos que no tenemos tu nombre. ¿Deseas agregarlo?",
-                'buttons' => [
-                    ['id' => 'misdatos_solicitar_nombre_si', 'title' => 'Sí, agregar nombre'],
-                    ['id' => 'misdatos_solicitar_nombre_no', 'title' => 'No, gracias']
-                ]
+            $messagesToSend[] = [
+                'fulfillmentText' => "Parece que aún no estás registrado. Puedes intentar una acción como reservar o inscribirte para registrarte.",
+                'message_type' => 'text',
+                'payload' => [],
             ];
         } else {
-            // Si ya tiene nombre, preguntar si quiere actualizar nombre o email
-            return [
-                'type' => 'interactive_buttons',
-                'text' => $responseText . "\n\n¿Deseas modificar tu nombre o email?",
-                'buttons' => [
-                    ['id' => 'misdatos_solicitar_nombre_si', 'title' => 'Modificar Nombre'],
-                    ['id' => 'misdatos_solicitar_email_si', 'title' => 'Modificar Email'],
-                    ['id' => 'menu', 'title' => 'Volver al Menú']
-                ]
+            $nombreCliente = $cliente->nombre ?? 'No registrado';
+            $emailCliente = $cliente->email ?? 'No registrado';
+
+            $responseText = "Aquí están tus datos actuales:\n";
+            $responseText .= "👤 Nombre: " . $nombreCliente . "\n";
+            $responseText .= "📧 Email: " . $emailCliente;
+
+            // Primer mensaje: los datos del cliente
+            $messagesToSend[] = [
+                'fulfillmentText' => $responseText,
+                'message_type' => 'text',
+                'payload' => [],
             ];
+
+            // Segundo mensaje: los botones de acción
+            $textoBotones = "\n¿Deseas modificar alguno de estos datos?";
+            $buttons = [
+                ['id' => 'Modificar mi nombre', 'title' => '✏️ Modificar Nombre'], // Activa Chatbot_MisDatos_SolicitarNombre
+                ['id' => 'Modificar mi email', 'title' => '📧 Modificar Email'],   // Activa Chatbot_MisDatos_SolicitarEmail
+                ['id' => 'menu', 'title' => '‹ Volver al Menú']
+            ];
+
+            $messagesToSend[] = [
+                'fulfillmentText' => $textoBotones, // El cuerpo del mensaje de botones
+                'message_type' => 'interactive_buttons',
+                'payload' => ['buttons' => $buttons],
+            ];
+
+            // Establecer un contexto para saber que el usuario está en el submenú de "Mis Datos"
+            // y espera una acción relacionada con la modificación.
+            $projectId = trim(config('dialogflow.project_id'), '/');
+            $sessionId = 'whatsapp-' . $senderId;
+            if ($projectId) {
+                $outputContextsToSetActive[] = ['name' => "projects/{$projectId}/agent/sessions/{$sessionId}/contexts/mis_datos_esperando_opcion", 'lifespanCount' => 2];
+                // Limpiar contextos de otros flujos si es necesario
+                $contextsToClear = ['reserva_cancha_en_progreso']; // Ejemplo
+                foreach ($contextsToClear as $ctxName) {
+                    $outputContextsToSetActive[] = ['name' => "projects/{$projectId}/agent/sessions/{$sessionId}/contexts/{$ctxName}", 'lifespanCount' => 0];
+                }
+            }
         }
+
+        return [
+            'messages_to_send' => $messagesToSend,
+            'outputContextsToSetActive' => []
+        ];
     }
 }

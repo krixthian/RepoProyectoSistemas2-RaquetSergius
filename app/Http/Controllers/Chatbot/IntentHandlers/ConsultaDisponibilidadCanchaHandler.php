@@ -5,134 +5,169 @@ namespace App\Http\Controllers\Chatbot\IntentHandlers;
 use App\Chatbot\IntentHandlerInterface;
 use App\Services\ReservaService;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
-
 
 class ConsultaDisponibilidadCanchaHandler implements IntentHandlerInterface
 {
-
-    private const HORA_INICIO_OPERACION = 9;
+    private const HORA_INICIO_OPERACION = 8;
     private const HORA_FIN_OPERACION = 22;
     private const TOTAL_CANCHAS = 3;
-
     protected $reservaService;
-
+    private const CACHE_TTL_MINUTES = 30;
 
     public function __construct(ReservaService $reservaService)
     {
         $this->reservaService = $reservaService;
     }
 
-    /**
-     * Maneja la consulta de disponibilidad de canchas.
-     *
-     * @param array $parameters Parámetros de Dialogflow (espera 'fecha').
-     * @param string $senderId ID del remitente.
-     * @return string Respuesta para el usuario.
-     */
-    public function handle(array $parameters, string $senderId): string
+    private function normalizePhoneNumber(string $phoneNumber): string
     {
-        Log::info('Executing ConsultaDisponibilidadCanchaHandler');
+        if (strpos($phoneNumber, 'whatsapp:+') === 0) {
+            return substr($phoneNumber, strlen('whatsapp:+'));
+        }
+        return preg_replace('/[^0-9+]/', '', $phoneNumber);
+    }
 
+    public function handle(array $parameters, string $senderId, ?string $action = null): string // Devuelve string
+    {
+        $telefonoNormalizado = $this->normalizePhoneNumber($senderId);
+        $reservaCacheKey = 'reserva_cache_' . $telefonoNormalizado;
+        $datosReservaEnCache = Cache::get($reservaCacheKey, []);
+        $datosReservaEnCache = array_merge([
+            'fecha' => null,
+            'hora_inicio' => null,
+            'paso_actual' => 'inicio',
+        ], $datosReservaEnCache);
+
+        Log::info('[ConsultaDisponibilidadHandler] Ejecutando. Sender: ' . $senderId . '. Params: ', $parameters);
+        Log::debug('[ConsultaDisponibilidadHandler] Caché inicial: ', $datosReservaEnCache);
 
         $fechaParam = $parameters['fecha'] ?? null;
-        $responseText = "Por favor, indica la fecha para la que quieres consultar la disponibilidad (ej. 'mañana', 'el próximo jueves', '15 de abril').";
+        $horaInicioParam = $parameters['horaini'] ?? null; // Dialogflow puede enviar 'horaini'
 
-        // Procesa solo si se recibió el parámetro 'fecha'
+        $fechaConsulta = null;
+        $horaInicioConsultaObj = null;
+
         if ($fechaParam) {
             try {
-                // Parsea la fecha recibida y la establece al inicio del día
                 $fechaConsulta = Carbon::parse($fechaParam)->startOfDay();
-
-
-                $fechaFormateada = $fechaConsulta->format('d/m/Y');
-
-
-                // Formato Y-m-d para el servicio/API
-                $fechaParaServicio = $fechaConsulta->toDateString();
-
-                if ($fechaConsulta->isPast() && !$fechaConsulta->isToday()) {
-                    return "Lo siento, no puedes consultar disponibilidad para fechas pasadas. Por favor, indica una fecha a partir de hoy.";
-                }
-
-                Log::info("Calling ReservaService->getReservasConfirmadasPorFecha directly for " . $fechaParaServicio);
-                $reservasDelDia = $this->reservaService->getReservasConfirmadasPorFecha($fechaParaServicio);
-
-                if ($reservasDelDia === null) {
-                    return "Hubo un problema interno al consultar la disponibilidad. Por favor, intenta de nuevo más tarde.";
-                }
-
-                Log::info("ReservaService call successful. Found " . count($reservasDelDia) . " reservations for " . $fechaParaServicio);
-
-
-                $ocupacionPorHora = [];
-                for ($h = self::HORA_INICIO_OPERACION; $h < self::HORA_FIN_OPERACION; $h++) {
-                    $ocupacionPorHora[$h] = 0;
-                }
-
-                if (is_array($reservasDelDia) && !empty($reservasDelDia)) {
-                    foreach ($reservasDelDia as $reserva) {
-                        try {
-                            $inicioReserva = Carbon::parse($reserva['hora_inicio']);
-                            $finReserva = Carbon::parse($reserva['hora_fin']);
-
-                            // Incrementa el contador para cada hora que abarca la reserva
-                            $horaActual = $inicioReserva->copy();
-                            while ($horaActual->lt($finReserva)) {
-                                $horaKey = $horaActual->hour;
-                                // Solo cuenta si la hora está dentro del rango de operación
-                                if (isset($ocupacionPorHora[$horaKey])) {
-                                    $ocupacionPorHora[$horaKey]++;
-                                }
-                                $horaActual->addHour(); // Pasa a la siguiente hora
-                            }
-                        } catch (\Exception $parseError) {
-                            // Logea si hay error parseando las horas de una reserva específica
-                            Log::error("Error parsing reservation time: " . $parseError->getMessage() . " Data: " . json_encode($reserva));
-                            // Continúa con la siguiente reserva
-                        }
-                    }
-                }
-
-                $horasDisponibles = [];
-                for ($h = self::HORA_INICIO_OPERACION; $h < self::HORA_FIN_OPERACION; $h++) {
-                    if (isset($ocupacionPorHora[$h]) && $ocupacionPorHora[$h] < self::TOTAL_CANCHAS) {
-                        $horasDisponibles[] = sprintf('%02d:00', $h); // Formato HH:00
-                    }
-                }
-
-                $horasOcupadas = [];
-                for ($h = self::HORA_INICIO_OPERACION; $h < self::HORA_FIN_OPERACION; $h++) {
-                    if (!(isset($ocupacionPorHora[$h]) && $ocupacionPorHora[$h] < self::TOTAL_CANCHAS)) {
-                        $horasOcupadas[] = sprintf('%02d:00', $h); // Formato HH:00
-                    }
-                }
-
-
-                if (empty($horasDisponibles)) {
-                    $responseText = "Lo siento, no quedan horas disponibles para el {$fechaFormateada}. ¿Te gustaría consultar otra fecha?";
-                } else {
-                    $responseText = "Para el {$fechaFormateada}, las horas con al menos una cancha disponible (inicio de hora) son:\n";
-                    $responseText .= implode("\n", $horasDisponibles); // Lista las horas disponibles
-
-                    $responseText .= "\n\nLas horas ocupadas son:\n~";
-                    $responseText .= implode("\n", $horasOcupadas); // Lista las horas ocupadas
-                    $responseText .= "~";
-
-                    $responseText .= "\n\nPor favor, indica la hora que te gustaría reservar (por ejemplo: 'quiero reservar el jueves a las 14:00')."; // Sugiere siguiente paso
-                }
-
-                // Captura de Excepciones Específicas
-            } catch (\Carbon\Exceptions\InvalidFormatException $e) {
-                Log::error("Invalid date format received from Dialogflow: " . json_encode($fechaParam));
-                $responseText = "No entendí la fecha que proporcionaste. Por favor, inténtalo de nuevo (ej. 'mañana', 'el próximo martes', '15 de abril').";
+                $datosReservaEnCache['fecha'] = $fechaConsulta->toDateString();
             } catch (\Exception $e) {
-                // Captura cualquier otra excepción inesperada durante el proceso
-                Log::error("Exception in ConsultaDisponibilidadCanchaHandler: " . $e->getMessage() . "\n" . $e->getTraceAsString());
-                $responseText = "Ocurrió un error inesperado al consultar la disponibilidad. Intenta de nuevo más tarde.";
+                Log::warning("[ConsultaDisponibilidadHandler] Fecha inválida en parámetro: {$fechaParam}");
+                // No hacer nada, se pedirá más adelante si es necesario
+            }
+        } elseif ($datosReservaEnCache['fecha']) {
+            $fechaConsulta = Carbon::parse($datosReservaEnCache['fecha'])->startOfDay();
+        }
+
+        if ($horaInicioParam) {
+            try {
+                $horaInicioConsultaObj = Carbon::parse($horaInicioParam);
+                $datosReservaEnCache['hora_inicio'] = $horaInicioConsultaObj->format('H:i:s');
+            } catch (\Exception $e) {
+                Log::warning("[ConsultaDisponibilidadHandler] Hora inicio inválida en parámetro: {$horaInicioParam}");
+            }
+        } elseif ($datosReservaEnCache['hora_inicio']) {
+            try {
+                $horaInicioConsultaObj = Carbon::parse($datosReservaEnCache['hora_inicio']);
+            } catch (\Exception $e) {
+                // Si la hora en caché es inválida, la limpiamos para que se vuelva a pedir si es necesario.
+                $datosReservaEnCache['hora_inicio'] = null;
             }
         }
 
-        return $responseText;
+        // Si después de procesar parámetros y caché, no tenemos fecha, la pedimos.
+        if (!$fechaConsulta) {
+            $datosReservaEnCache['paso_actual'] = 'esperando_fecha'; // Indicar que el próximo input debe ser una fecha
+            Cache::put($reservaCacheKey, $datosReservaEnCache, now()->addMinutes(self::CACHE_TTL_MINUTES));
+            Log::debug('[ConsultaDisponibilidadHandler] Solicitando fecha. Caché guardada: ', $datosReservaEnCache);
+            return "Por favor, ¿para qué fecha quieres consultar la disponibilidad? (Ej: mañana, próximo lunes)";
+        }
+
+        // Si la fecha es pasada (y no es hoy)
+        if ($fechaConsulta->isPast() && !$fechaConsulta->isToday()) {
+            unset($datosReservaEnCache['fecha']); // Limpiar fecha inválida
+            $datosReservaEnCache['paso_actual'] = 'esperando_fecha';
+            Cache::put($reservaCacheKey, $datosReservaEnCache, now()->addMinutes(self::CACHE_TTL_MINUTES));
+            Log::debug('[ConsultaDisponibilidadHandler] Fecha pasada. Solicitando nueva fecha. Caché guardada: ', $datosReservaEnCache);
+            return "Lo siento, no puedes consultar disponibilidad para fechas pasadas. Por favor, indica una fecha a partir de hoy.";
+        }
+
+        // Guardar el estado actual en caché (fecha y posiblemente hora_inicio)
+        // y el paso siguiente esperado.
+        if ($horaInicioConsultaObj) {
+            $datosReservaEnCache['paso_actual'] = 'esperando_hora_fin_o_duracion'; // Si ya tenemos fecha y hora_inicio
+        } else {
+            $datosReservaEnCache['paso_actual'] = 'esperando_hora_inicio'; // Si solo tenemos fecha
+        }
+        Cache::put($reservaCacheKey, $datosReservaEnCache, now()->addMinutes(self::CACHE_TTL_MINUTES));
+        Log::debug('[ConsultaDisponibilidadHandler] Fecha y/o hora procesadas. Caché actualizada: ', $datosReservaEnCache);
+
+        $fechaFormateadaUser = $fechaConsulta->locale('es')->isoFormat('dddd D [de] MMMM');
+        $respuesta = "";
+
+        if ($horaInicioConsultaObj) {
+            $respuesta .= "Disponibilidad para el {$fechaFormateadaUser} a partir de las " . $horaInicioConsultaObj->format('H:i') . ":\n";
+        } else {
+            $respuesta .= "Disponibilidad para el {$fechaFormateadaUser}:\n";
+        }
+
+        $reservasDelDia = $this->reservaService->getReservasConfirmadasPorFecha($fechaConsulta->toDateString());
+
+        if ($reservasDelDia === null) {
+            return "Hubo un problema interno al consultar la disponibilidad. Por favor, intenta de nuevo más tarde.";
+        }
+
+        $ocupacionPorHora = [];
+        for ($h = self::HORA_INICIO_OPERACION; $h < self::HORA_FIN_OPERACION; $h++) {
+            $ocupacionPorHora[$h] = 0;
+        }
+
+        if (is_array($reservasDelDia)) {
+            foreach ($reservasDelDia as $reserva) {
+                try {
+                    $inicioReserva = Carbon::parse($reserva['hora_inicio']);
+                    $finReserva = Carbon::parse($reserva['hora_fin']);
+                    $horaActual = $inicioReserva->copy();
+                    while ($horaActual->lt($finReserva)) {
+                        $horaKey = $horaActual->hour;
+                        if (isset($ocupacionPorHora[$horaKey])) {
+                            $ocupacionPorHora[$horaKey]++;
+                        }
+                        $horaActual->addHour();
+                    }
+                } catch (\Exception $parseError) {
+                    Log::error("[ConsultaDisponibilidadHandler] Error parseando hora de reserva: " . $parseError->getMessage(), ['reserva' => $reserva]);
+                }
+            }
+        }
+
+        $horasDisponibles = [];
+        $filtroHoraInicio = $horaInicioConsultaObj ? $horaInicioConsultaObj->hour : self::HORA_INICIO_OPERACION;
+
+        for ($h = $filtroHoraInicio; $h < self::HORA_FIN_OPERACION; $h++) {
+            if ($fechaConsulta->isToday() && $h < Carbon::now()->hour) { // No mostrar horas pasadas para hoy
+                continue;
+            }
+            if (isset($ocupacionPorHora[$h]) && $ocupacionPorHora[$h] < self::TOTAL_CANCHAS) {
+                $horasDisponibles[] = sprintf('%02d:00', $h);
+            }
+        }
+
+        if (empty($horasDisponibles)) {
+            $respuesta .= "Lo siento, no quedan horas disponibles ";
+            if ($horaInicioConsultaObj) {
+                $respuesta .= "a partir de las " . $horaInicioConsultaObj->format('H:i') . ".";
+            } else {
+                $respuesta .= "para esta fecha.";
+            }
+            $respuesta .= "\n¿Te gustaría consultar otra fecha u hora?";
+        } else {
+            $respuesta .= "Horas con al menos una cancha disponible (inicio de hora):\n";
+            $respuesta .= implode("\n", $horasDisponibles);
+            $respuesta .= "\n\nSi deseas reservar, dime la hora que te interesa?";
+        }
+        return $respuesta;
     }
 }
