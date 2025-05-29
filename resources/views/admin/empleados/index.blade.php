@@ -95,7 +95,7 @@
         }
 
         .btn-manage.disabled {
-            background-color: #A0AEC0;
+            background-color: #A0AEC0;z
             color: #E2E8F0;
             cursor: not-allowed;
         }
