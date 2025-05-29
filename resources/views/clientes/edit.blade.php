@@ -49,7 +49,7 @@
 
         <div class="mb-3">
             <label for="telefono">Teléfono</label>
-            <input type="text" name="telefono" id="telefono" class="form-control" value="{{ old('telefono', $cliente->telefono) }}">
+            <input type="number" name="telefono" max="99999999" id="telefono" class="form-control" value="{{ old('telefono', $cliente->telefono) }}">
 </div>
     <div class="mb-3">
         <label for="email">Email</label>

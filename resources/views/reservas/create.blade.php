@@ -168,7 +168,7 @@
 
              <div class="form-group">
                 <label for="monto">Monto Total Reserva (Bs.):</label>
-                <input type="number" step="0.01" min="0" max="30" name="monto" id="monto" value="{{ old('monto') }}" required>
+                <input type="number" step="0.01" min="0" max="90" name="monto" id="monto" value="{{ old('monto') }}" required>
             </div>
 
              <div class="form-group">

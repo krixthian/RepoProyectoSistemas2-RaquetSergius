@@ -118,8 +118,8 @@
 
             <div class="form-group">
                 <label for="fecha">Fecha:</label>
-                <input type="date" name="fecha" id="fecha"
-                       value="{{ old('fecha', optional($reserva->fecha)->format('Y-m-d')) }}" required>
+                <input type="date" name="fecha" id="fecha" value="{{ old('fecha') }}" min="{{ date('Y-m-d') }}" required>
+
             </div>
 
             <div class="form-group">
@@ -142,7 +142,7 @@
 
             <div class="form-group">
                 <label for="monto">Monto Total (Bs.):</label>
-                <input type="number" step="0.01" min="0" name="monto" id="monto"
+                <input type="number" step="0.01" min="0" max="90" name="monto" id="monto"
                        value="{{ old('monto', $reserva->monto) }}" required>
             </div>
 
