@@ -34,7 +34,6 @@ Route::apiResource('reservas', ReservaController::class);
 Route::apiResource('clases-zumba', ClaseZumbaController::class);
 Route::apiResource('inscripciones-clase', InscripcionClaseController::class);
 Route::apiResource('eventos', EventoController::class);
-Route::apiResource('torneos', TorneoController::class);
 Route::apiResource('equipos', EquipoController::class);
 Route::apiResource('planes-membresia', PlanMembresiaController::class);
 Route::apiResource('membresias-cliente', MembresiaClienteController::class);

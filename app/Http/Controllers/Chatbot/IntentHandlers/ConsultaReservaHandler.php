@@ -28,7 +28,7 @@ class ConsultaReservaHandler implements IntentHandlerInterface
      * @param string $senderId ID del remitente (número de WhatsApp).
      * @return string Respuesta para el usuario.
      */
-    public function handle(array $parameters, string $senderId): string
+    public function handle(array $parameters, string $senderId, ?string $action = null): string
     {
         Log::info('Executing ConsultarReservaHandler for senderId: ' . $senderId);
         Carbon::setLocale('es');

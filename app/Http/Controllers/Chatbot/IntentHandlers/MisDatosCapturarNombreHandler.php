@@ -1,72 +1,79 @@
-<?php
-
+<?php // app/Http/Controllers/Chatbot/IntentHandlers/MisDatosCapturarNombreHandler.php
 namespace App\Http\Controllers\Chatbot\IntentHandlers;
-
 use App\Chatbot\IntentHandlerInterface;
-use App\Services\ClienteService;
-use Illuminate\Support\Facades\Log;
+use App\Services\ClienteService; // Asumiendo que usas este servicio
+use Illuminate\Support\Facades\Log; //
 
 class MisDatosCapturarNombreHandler implements IntentHandlerInterface
 {
-    protected ClienteService $clienteService;
+    protected ClienteService $clienteService; //
 
-    public function __construct(ClienteService $clienteService)
+    public function __construct(ClienteService $clienteService) //
     {
-        $this->clienteService = $clienteService;
+        $this->clienteService = $clienteService; //
     }
 
-    private function normalizePhoneNumber(string $phoneNumber): string
+    public function handle(array $parameters, string $senderId, ?string $action = null): array
     {
-        // Quitar el prefijo 'whatsapp:+' si está presente
-        if (strpos($phoneNumber, 'whatsapp:+') === 0) {
-            $phoneNumber = substr($phoneNumber, strlen('whatsapp:+'));
-        }
-        // Quitar cualquier otro carácter que no sea un dígito
-        return preg_replace('/[^0-9]/', '', $phoneNumber);
-    }
+        Log::debug("[MisDatosCapturarNombreHandler] Teléfono Normalizado: {$senderId}"); //
+        Log::debug("[MisDatosCapturarNombreHandler] Parámetros recibidos: ", $parameters); //
 
-    public function handle(array $parameters, string $senderId): array
-    {
-        $telefonoNormalizado = $this->normalizePhoneNumber($senderId);
+        // El nombre puede venir de un parámetro 'person.name' si usas @sys.person
+        // o un parámetro personalizado si tienes una entidad para nombres, o 'any'.
+        $nombreCapturado = $parameters['nombre_completo'] ?? $parameters['person']['name'] ?? $parameters['any'] ?? null; //
 
-        // Obtener el nombre del parámetro 'any' como se ve en tus logs.
-        $nombreCapturado = $parameters['any'] ?? null;
-
-        // Log detallado para depuración
-        Log::debug("[MisDatosCapturarNombreHandler] Teléfono Normalizado: {$telefonoNormalizado}");
-        Log::debug("[MisDatosCapturarNombreHandler] Parámetros recibidos: " . json_encode($parameters));
-        Log::debug("[MisDatosCapturarNombreHandler] Nombre capturado (raw desde parameters['any']): " . ($nombreCapturado === null ? 'NULL' : "'{$nombreCapturado}'"));
-
-        $nombreLimpio = is_string($nombreCapturado) ? trim($nombreCapturado) : '';
-        $longitudNombreLimpio = strlen($nombreLimpio);
-
-        Log::debug("[MisDatosCapturarNombreHandler] Nombre limpio (después de trim): '{$nombreLimpio}'");
-        Log::debug("[MisDatosCapturarNombreHandler] Longitud del nombre limpio: {$longitudNombreLimpio}");
-
-        // Condición de validación
-        if (empty($nombreLimpio) || $longitudNombreLimpio < 3) {
-            Log::warning("[MisDatosCapturarNombreHandler] Nombre inválido o muy corto. Nombre limpio: '{$nombreLimpio}', Longitud: {$longitudNombreLimpio}. Se volverá a preguntar.");
-            return ['fulfillmentText' => "No entendí bien tu nombre. Por favor, escribe tu nombre completo e inténtalo de nuevo:"];
+        if (is_array($nombreCapturado) && isset($nombreCapturado['name'])) { // Común para @sys.person
+            $nombreCapturado = $nombreCapturado['name'];
         }
 
-        Log::info("[MisDatosCapturarNombreHandler] Nombre válido recibido: '{$nombreLimpio}'. Actualizando cliente...");
-        $clienteActualizado = $this->clienteService->actualizarDatosCliente($telefonoNormalizado, ['nombre' => $nombreLimpio]);
+        Log::debug("[MisDatosCapturarNombreHandler] Nombre capturado (raw): '{$nombreCapturado}'"); //
+        $fulfillmentText = "";
+        $outputContextsToSetActive = [];
+        $projectId = trim(config('dialogflow.project_id'), '/');
+        $sessionId = 'whatsapp-' . $senderId;
 
-        if (!$clienteActualizado) {
-            Log::error("[MisDatosCapturarNombreHandler] Error al actualizar el nombre para el cliente con teléfono: {$telefonoNormalizado}");
-            return ['fulfillmentText' => "Hubo un problema al guardar tu nombre. Por favor, intenta más tarde."];
+        if ($nombreCapturado && is_string($nombreCapturado)) {
+            $nombreLimpio = trim($nombreCapturado); //
+            Log::debug("[MisDatosCapturarNombreHandler] Nombre limpio (después de trim): '{$nombreLimpio}'"); //
+
+            if (strlen($nombreLimpio) > 2 && !is_numeric($nombreLimpio) && !preg_match('/(\d+\s*(hora|minuto|h|min|pm|am))/i', $nombreLimpio) && count(explode(' ', $nombreLimpio)) >= 2) { // Validación simple: al menos 3 letras, no solo números, no frases de tiempo, al menos dos palabras
+                Log::info("[MisDatosCapturarNombreHandler] Nombre válido recibido: '{$nombreLimpio}'. Actualizando cliente..."); //
+                $actualizado = $this->clienteService->actualizarDatosCliente($senderId, ['nombre' => $nombreLimpio]); //
+                if ($actualizado) {
+                    $fulfillmentText = "¡Perfecto! Tu nombre ha sido actualizado a: *{$nombreLimpio}*.\n\npuedes volver a escribir menu para volver al menú principal o escribir 'mis datos' para ver tus datos actuales.";
+                    // Reactivar contexto para opciones de Mis Datos o limpiar y permitir menú principal
+                    if ($projectId)
+                        $outputContextsToSetActive[] = ['name' => "projects/{$projectId}/agent/sessions/{$sessionId}/contexts/mis_datos_esperando_opcion", 'lifespanCount' => 2];
+                } else {
+                    $fulfillmentText = "Lo siento, no pude actualizar tu nombre en este momento. Intenta de nuevo.";
+                    if ($projectId)
+                        $outputContextsToSetActive[] = ['name' => "projects/{$projectId}/agent/sessions/{$sessionId}/contexts/mis_datos_esperando_nombre_captura", 'lifespanCount' => 1]; // Mantener para reintentar
+                }
+            } else {
+                $fulfillmentText = "El nombre '{$nombreLimpio}' no parece válido. Por favor, ingresa tu nombre y apellido. Ejemplo: Juan Pérez";
+                if ($projectId)
+                    $outputContextsToSetActive[] = ['name' => "projects/{$projectId}/agent/sessions/{$sessionId}/contexts/mis_datos_esperando_nombre_captura", 'lifespanCount' => 2]; // Para reintentar
+            }
+        } else {
+            $fulfillmentText = "No pude entender el nombre que proporcionaste. ¿Podrías intentarlo de nuevo?";
+            if ($projectId)
+                $outputContextsToSetActive[] = ['name' => "projects/{$projectId}/agent/sessions/{$sessionId}/contexts/mis_datos_esperando_nombre_captura", 'lifespanCount' => 2]; // Para reintentar
         }
 
-        Log::info("[MisDatosCapturarNombreHandler] Nombre actualizado para cliente {$telefonoNormalizado} a: {$nombreLimpio}");
+        if ($projectId)
+            $outputContextsToSetActive[] = ['name' => "projects/{$projectId}/agent/sessions/{$sessionId}/contexts/mis_datos_esperando_nombre_captura", 'lifespanCount' => 0]; // Siempre limpiar el contexto de captura
 
-        // Flujo para solicitar el email
         return [
-            'type' => 'interactive_buttons',
-            'text' => "¡Gracias, " . htmlspecialchars($nombreLimpio) . "! Tu nombre ha sido guardado. ¿Deseas agregar o actualizar tu correo electrónico? (Es opcional)",
-            'buttons' => [
-                ['id' => 'misdatos_solicitar_email_si', 'title' => 'Sí, agregar email'],
-                ['id' => 'misdatos_solicitar_email_no', 'title' => 'No, gracias']
-            ]
+            'messages_to_send' => [
+                [
+                    'fulfillmentText' => $fulfillmentText,
+                    'message_type' => 'text', // O botones para volver a Mis Datos / Menú Principal
+                    'payload' => []
+                    // Ejemplo de payload con botones:
+                    // 'payload' => ['buttons' => [['id' => 'Mis datos', 'title' => '‹ Mis Datos'], ['id' => 'menu', 'title' => '‹ Menú Principal']]]
+                ]
+            ],
+            'outputContextsToSetActive' => $outputContextsToSetActive
         ];
     }
 }

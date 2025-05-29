@@ -7,9 +7,11 @@ interface IntentHandlerInterface
     /**
      * Maneja la lógica para un intent específico.
      *
-     * @param array $parameters Parámetros extraídos por Dialogflow.
-     * @param string $senderId El ID del remitente (ej. número de WhatsApp).
-     * @return string El texto de respuesta a enviar al usuario.
+     * @param array $parameters Parámetros extraidos Dialogflow.
+     * @param string $senderId numero de whtsapp
+     * @return string El texto de respuesta para enviar usuario
      */
-    public function handle(array $parameters, string $senderId): string|array;
+
+    public function handle(array $parameters, string $senderId, ?string $action = null);
+    // public function handle(array $parameters, string $senderId, ?string $action = null): string|array;
 }
