@@ -18,6 +18,8 @@ class InscripcionClase extends Model
         'clase_id',
         'cliente_id',
         'fecha_inscripcion',
+        'fecha_clase',
+        'fecha_cancelacion',
         'estado',
         'monto_pagado',
         'metodo_pago',
@@ -31,7 +33,14 @@ class InscripcionClase extends Model
         'monto_pagado' => 'decimal:2',
         'fecha_pago' => 'datetime',
     ];
-
+    protected $dates = [
+        'fecha_inscripcion',
+        'fecha_clase',
+        'fecha_cancelacion',
+        'fecha_pago',
+        'created_at', // Eloquent ya las maneja si usas timestamps()
+        'updated_at'  // pero no está de más ser explícito si no usas timestamps()
+    ];
     public function claseZumba()
     {
         return $this->belongsTo(ClaseZumba::class, 'clase_id', 'clase_id');
