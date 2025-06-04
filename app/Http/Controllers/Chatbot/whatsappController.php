@@ -95,19 +95,17 @@ class whatsappController extends Controller
         'Consulta Reserva' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaReservaHandler::class,
 
         // MAPEO ZUMBA
-        'Consulta Horarios Zumba' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaHorariosZumbaHandler::class,
-        // consultar próxima clase Zumba
-        'Zumba_Consultar_Mis_Clases' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultarProximaClaseZumbaHandler::class,
-        //cancelar inscripción Zumba
-        'Zumba_Cancelacion_Confirmar_No' => \App\Http\Controllers\Chatbot\IntentHandlers\CancelarInscripcionZumbaHandler::class,
-        'Zumba_Cancelacion_Confirmar_Si' => \App\Http\Controllers\Chatbot\IntentHandlers\CancelarInscripcionZumbaHandler::class,
-        'Zumba_Cancelacion_Iniciar' => \App\Http\Controllers\Chatbot\IntentHandlers\CancelarInscripcionZumbaHandler::class,
-        'Zumba_Cancelacion_SeleccionarClases' => \App\Http\Controllers\Chatbot\IntentHandlers\CancelarInscripcionZumbaHandler::class,
 
         // Inscripción Zumba
 
+        'Zumba_CancelacionInscripcion_ConfirmarNo' => \App\Http\Controllers\Chatbot\IntentHandlers\CancelarInscripcionZumbaHandler::class,
+        'Zumba_CancelacionInscripcion_ConfirmarSi' => \App\Http\Controllers\Chatbot\IntentHandlers\CancelarInscripcionZumbaHandler::class,
+        'Zumba_CancelacionInscripcion_Iniciar' => \App\Http\Controllers\Chatbot\IntentHandlers\CancelarInscripcionZumbaHandler::class,
+        'Zumba_CancelacionInscripcion_Seleccionar' => \App\Http\Controllers\Chatbot\IntentHandlers\CancelarInscripcionZumbaHandler::class,
+        'Zumba_Consultar_Mis_Clases' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultarProximaClaseZumbaHandler::class,
+        'Zumba_Inscripcion_ConfirmarNo' => \App\Http\Controllers\Chatbot\IntentHandlers\InscribirClaseZumbaHandler::class,
+        'Zumba_Inscripcion_ConfirmarSi' => \App\Http\Controllers\Chatbot\IntentHandlers\InscribirClaseZumbaHandler::class,
         'Zumba_Inscripcion_Iniciar' => \App\Http\Controllers\Chatbot\IntentHandlers\InscribirClaseZumbaHandler::class,
-        'Zumba_Inscripcion_ProporcionarFecha' => \App\Http\Controllers\Chatbot\IntentHandlers\InscribirClaseZumbaHandler::class,
         'Zumba_Inscripcion_SeleccionarClases' => \App\Http\Controllers\Chatbot\IntentHandlers\InscribirClaseZumbaHandler::class,
 
         // MAPEO MENU
