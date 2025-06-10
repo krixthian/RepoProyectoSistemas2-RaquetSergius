@@ -4,183 +4,289 @@
     <meta charset="UTF-8">
     <title>Editar Reserva #{{ $reserva->reserva_id }}</title>
     <style>
-        body {
-            font-family: sans-serif;
-            margin: 20px;
-            background-color: #2C3844;
-            color: #ADBCB9;
-        }
-        h1 {
-            color: #59FFD8;
-            border-bottom: 2px solid #59FFD8;
-            padding-bottom: 10px;
-            margin-bottom: 25px;
-        }
-        .form-group { margin-bottom: 18px; }
-        label {
-            display: block;
-            margin-bottom: 6px;
-            font-weight: bold;
-            color: #ADBCB9;
-        }
-        input, select {
-            width: 100%;
-            padding: 10px;
-            box-sizing: border-box;
-            border: 1px solid #ADBCB9;
-            background-color: #2C3844;
-            color: white;
-            border-radius: 4px;
-        }
-        .alert { padding:15px; margin-bottom:20px; border-radius:4px; }
-        .alert-danger { color:#a94442; background:#f2dede; border:1px solid #ebccd1; }
-        button {
-            padding:10px 20px;
-            background:#59FFD8;
-            color:#2C3844;
-            border:none;
-            border-radius:4px;
-            font-weight:bold;
-            text-transform:uppercase;
-            cursor:pointer;
-            transition: background 0.2s;
-        }
-        button:hover { background:#ADBCB9; }
-        a.cancel {
-            margin-left:15px;
-            color:#59FFD8;
-            text-decoration:none;
-        }
-        a.cancel:hover { color:#ADBCB9; }
-        fieldset {
-            border:1px solid #ADBCB9;
-            padding:20px;
-            margin-bottom:25px;
-            border-radius:4px;
-        }
-        legend {
-            font-weight:bold;
-            padding:0 10px;
-            color:#59FFD8;
-        }
-        input[type=checkbox] { width:auto; vertical-align:middle; }
-        input[type=checkbox] + label { display:inline; margin-left:5px; font-weight:normal; color:#ADBCB9; }
-    </style>
+    /* 1. Paleta de Colores y Estilos Base */
+    :root {
+        --background-color: #1a1a1a;
+        --surface-color: #242424;
+        --primary-color: #00aaff;
+        --text-color: #e0e0e0;
+        --text-muted-color: #888;
+        --border-color: #333;
+        --danger-color: #ff3b30;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        margin: 0;
+        padding: 2rem;
+        background-color: var(--background-color);
+        color: var(--text-color);
+        line-height: 1.6;
+    }
+
+    .container {
+        max-width: 800px; /* Ancho más adecuado para formularios */
+        margin: 0 auto;
+    }
+
+    h1 {
+        color: var(--primary-color);
+        font-weight: 600;
+        margin-bottom: 2rem;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 1rem;
+    }
+
+    /* 2. Alertas de Notificación */
+    .alert {
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        border-left: 4px solid;
+        border-radius: 4px;
+        list-style-position: inside;
+    }
+
+    .alert-danger {
+        background-color: rgba(255, 59, 48, 0.1);
+        border-left-color: var(--danger-color);
+        color: var(--text-color);
+    }
+    .alert-danger ul {
+        margin-top: 0.5rem;
+        padding-left: 1rem;
+    }
+
+    /* 3. Estilos de Formularios y Tarjetas */
+    .form-card, .detail-card {
+        background-color: var(--surface-color);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr; /* Rejilla de dos columnas */
+        gap: 1.5rem;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .form-group.full-width {
+        grid-column: 1 / -1; /* Ocupa todo el ancho */
+    }
+
+    label {
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: var(--text-muted-color);
+    }
+
+    input, select {
+        width: 100%;
+        padding: 0.75rem;
+        box-sizing: border-box;
+        border: 1px solid var(--border-color);
+        background-color: var(--background-color); /* Fondo más oscuro para contraste */
+        color: var(--text-color);
+        border-radius: 8px;
+        font-size: 1rem;
+    }
+
+    input:focus, select:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(0, 170, 255, 0.3);
+    }
+
+    .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        background-color: var(--background-color);
+        padding: 0.75rem;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+    }
+    input[type="checkbox"] {
+        width: 1.25em;
+        height: 1.25em;
+    }
+    .checkbox-group label {
+        margin: 0;
+        color: var(--text-color);
+        font-weight: normal;
+    }
+
+    /* 4. Botones */
+    .form-actions {
+        margin-top: 2rem;
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+    }
+
+    .button, .button-link {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .button:hover, .button-link:hover {
+        background-color: #0088cc;
+        transform: translateY(-2px);
+    }
+
+    .button-secondary {
+        background-color: transparent;
+        color: var(--primary-color);
+        border: 1px solid var(--primary-color);
+    }
+    .button-secondary:hover {
+        background-color: rgba(0, 170, 255, 0.1);
+        color: var(--primary-color);
+        transform: translateY(-2px);
+    }
+
+    /* 5. Estilos para la Página de Detalles */
+    .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .detail-item strong {
+        display: block;
+        color: var(--text-muted-color);
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+    }
+
+    .detail-item span {
+        font-size: 1.1rem;
+    }
+</style>
 </head>
 <body>
     @php use Carbon\Carbon; @endphp
+    
+    <div class="container">
+        <h1>Editar Reserva #{{ $reserva->reserva_id }}</h1>
 
-    <h1>Editar Reserva #{{ $reserva->reserva_id }}</h1>
-
-    @if ($errors->any())
-        <div class="alert alert-danger">
-            <strong>¡Error!</strong> Revisa los campos marcados.
-            <ul>
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
-
-    <form action="{{ route('reservas.update', $reserva->reserva_id) }}" method="POST">
-        @csrf
-        @method('PUT')
-
-        <fieldset>
-            <legend>Datos de la Reserva</legend>
-
-            <div class="form-group">
-                <label for="cliente_id">Cliente:</label>
-                <select name="cliente_id" id="cliente_id" required>
-                    <option value="">-- Selecciona un Cliente --</option>
-                    @foreach ($clientes as $cliente)
-                        <option value="{{ $cliente->cliente_id }}"
-                            {{ old('cliente_id', $reserva->cliente_id) == $cliente->cliente_id ? 'selected' : '' }}>
-                            {{ $cliente->nombre }}
-                        </option>
+        @if ($errors->any())
+            <div class="alert alert-danger">
+                <strong>¡Error!</strong> Revisa los campos del formulario.
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
                     @endforeach
-                </select>
+                </ul>
+            </div>
+        @endif
+
+        <form action="{{ route('reservas.update', $reserva->reserva_id) }}" method="POST">
+            @csrf
+            @method('PUT')
+
+            <div class="form-card">
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="cliente_id">Cliente</label>
+                        <select name="cliente_id" id="cliente_id" required>
+                            @foreach ($clientes as $cliente)
+                                <option value="{{ $cliente->cliente_id }}"
+                                    {{ old('cliente_id', $reserva->cliente_id) == $cliente->cliente_id ? 'selected' : '' }}>
+                                    {{ $cliente->nombre }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label for="cancha_id">Cancha/Recurso</label>
+                        <select name="cancha_id" id="cancha_id" required>
+                            @foreach ($canchas as $cancha)
+                                <option value="{{ $cancha->cancha_id }}"
+                                    {{ old('cancha_id', $reserva->cancha_id) == $cancha->cancha_id ? 'selected' : '' }}>
+                                    {{ $cancha->nombre }} {{ $cancha->tipo ? '('.$cancha->tipo.')' : '' }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="fecha">Fecha</label>
+                        <input type="date" name="fecha" id="fecha" value="{{ old('fecha', $reserva->fecha ? Carbon::parse($reserva->fecha)->format('Y-m-d') : '') }}" min="{{ date('Y-m-d') }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="monto">Monto Total (Bs.)</label>
+                        <input type="number" step="0.01" min="0" name="monto" id="monto"
+                               value="{{ old('monto', $reserva->monto) }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="hora_inicio">Hora de Inicio</label>
+                        <input type="time" name="hora_inicio" id="hora_inicio"
+                               value="{{ old('hora_inicio', $reserva->hora_inicio ? Carbon::parse($reserva->hora_inicio)->format('H:i') : '') }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="hora_fin">Hora de Fin</label>
+                        <input type="time" name="hora_fin" id="hora_fin"
+                               value="{{ old('hora_fin', $reserva->hora_fin ? Carbon::parse($reserva->hora_fin)->format('H:i') : '') }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="estado">Estado</label>
+                        <select name="estado" id="estado" required>
+                            @foreach(['Pendiente','Confirmada','Cancelada','Completada'] as $estado)
+                                <option value="{{ $estado }}" {{ old('estado', $reserva->estado) == $estado ? 'selected' : '' }}>
+                                    {{ $estado }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="metodo_pago">Método de Pago</label>
+                        <select name="metodo_pago" id="metodo_pago">
+                            <option value="">-- Opcional --</option>
+                            @foreach(['QR','Efectivo','Tarjeta','Transferencia','Otro'] as $mp)
+                                <option value="{{ $mp }}" {{ old('metodo_pago', $reserva->metodo_pago) == $mp ? 'selected' : '' }}>
+                                    {{ $mp }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <div class="checkbox-group">
+                            <input type="hidden" name="pago_completo" value="0">
+                            <input type="checkbox" name="pago_completo" id="pago_completo" value="1"
+                                   {{ old('pago_completo', $reserva->pago_completo) ? 'checked' : '' }}>
+                            <label for="pago_completo">El pago de la reserva ya ha sido completado.</label>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="form-group">
-                <label for="cancha_id">Cancha/Recurso:</label>
-                <select name="cancha_id" id="cancha_id" required>
-                    <option value="">-- Selecciona una Cancha --</option>
-                    @foreach ($canchas as $cancha)
-                        <option value="{{ $cancha->cancha_id }}"
-                            {{ old('cancha_id', $reserva->cancha_id) == $cancha->cancha_id ? 'selected' : '' }}>
-                            {{ $cancha->nombre }} {{ $cancha->tipo ? '('.$cancha->tipo.')' : '' }}
-                        </option>
-                    @endforeach
-                </select>
+            <div class="form-actions">
+                <button type="submit" class="button">Actualizar Reserva</button>
+                <a href="{{ route('reservas.index') }}" class="button-link button-secondary">Cancelar</a>
             </div>
-
-            <div class="form-group">
-                <label for="fecha">Fecha:</label>
-                <input type="date" name="fecha" id="fecha" value="{{ old('fecha') }}" min="{{ date('Y-m-d') }}" required>
-
-            </div>
-
-            <div class="form-group">
-                <label for="hora_inicio">Hora de Inicio:</label>
-                <input type="time" name="hora_inicio" id="hora_inicio"
-                       value="{{ old('hora_inicio', $reserva->hora_inicio
-                           ? Carbon::parse($reserva->hora_inicio)->format('H:i')
-                           : '') }}"
-                       required>
-            </div>
-
-            <div class="form-group">
-                <label for="hora_fin">Hora de Fin:</label>
-                <input type="time" name="hora_fin" id="hora_fin"
-                       value="{{ old('hora_fin', $reserva->hora_fin
-                           ? Carbon::parse($reserva->hora_fin)->format('H:i')
-                           : '') }}"
-                       required>
-            </div>
-
-            <div class="form-group">
-                <label for="monto">Monto Total (Bs.):</label>
-                <input type="number" step="0.01" min="0" max="90" name="monto" id="monto"
-                       value="{{ old('monto', $reserva->monto) }}" required>
-            </div>
-
-            <div class="form-group">
-                <label for="estado">Estado:</label>
-                <select name="estado" id="estado" required>
-                    @foreach(['Pendiente','Confirmada','Cancelada','Completada'] as $estado)
-                        <option value="{{ $estado }}"
-                            {{ old('estado', $reserva->estado) == $estado ? 'selected' : '' }}>
-                            {{ $estado }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="metodo_pago">Método de Pago:</label>
-                <select name="metodo_pago" id="metodo_pago">
-                    <option value="">-- Opcional --</option>
-                    @foreach(['QR','Efectivo','Tarjeta','Transferencia','Otro'] as $mp)
-                        <option value="{{ $mp }}"
-                            {{ old('metodo_pago', $reserva->metodo_pago) == $mp ? 'selected' : '' }}>
-                            {{ $mp }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div class="form-group">
-                <input type="hidden" name="pago_completo" value="0">
-                <input type="checkbox" name="pago_completo" id="pago_completo" value="1"
-                       {{ old('pago_completo', $reserva->pago_completo) ? 'checked' : '' }}>
-                <label for="pago_completo">Pago Completo</label>
-            </div>
-        </fieldset>
-
-        <button type="submit">Actualizar Reserva</button>
-        <a href="{{ route('reservas.index') }}" class="cancel">Cancelar</a>
-    </form>
+        </form>
+    </div>
 </body>
 </html>
