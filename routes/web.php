@@ -23,6 +23,8 @@ use App\Http\Controllers\Admin\ChurnController;
 
 use App\Http\Controllers\reservasControllers\ReservaControllerComp;
 
+use App\Http\Controllers\zumba\InscripcionZumbaCompController;
+
 Route::get('/login', function () {
     if (auth()->check()) {
         return redirect()->intended(route('admin.empleados.index'));
@@ -42,9 +44,20 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/reservas/opciones/pendientes', [ReservaControllerComp::class, 'index'])->name('admin.reservas.pendientes');
     Route::get('/reservas/opciones/pendientes/{id_reserva}', [ReservaControllerComp::class, 'verReserva'])->name('admin.reservas.ver');
 
+    Route::post('/reservas/{id_reserva}/confirmar', [ReservaControllerComp::class, 'confirmarReserva'])->name('reservas.confirmar');
+    Route::post('/reservas/{id_reserva}/rechazar', [ReservaControllerComp::class, 'rechazarReserva'])->name('reservas.rechazar');
+
     //RESERVAS
     Route::resource('reservas', ReservaController::class);
 
+    // --- RUTAS ZUMBA ---
+    Route::prefix('/zumba')->name('zumba.')->group(function () {
+        Route::get('/opciones', [InscripcionZumbaCompController::class, 'opciones'])->name('opciones');
+        Route::get('/pendientes', [InscripcionZumbaCompController::class, 'index'])->name('pendientes');
+        Route::get('/ver-comprobante/{cliente_id}/{comprobante_hash}', [InscripcionZumbaCompController::class, 'verComprobante'])->name('verComprobante');
+        Route::post('/confirmar/{cliente_id}/{comprobante_hash}', [InscripcionZumbaCompController::class, 'confirmarInscripciones'])->name('pendientes.confirmar');
+        Route::post('/rechazar/{cliente_id}/{comprobante_hash}', [InscripcionZumbaCompController::class, 'rechazarInscripciones'])->name('pendientes.rechazar');
+    });
 
 
     Route::get('/admin/panel', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
