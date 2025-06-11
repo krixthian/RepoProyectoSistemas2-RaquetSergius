@@ -11,6 +11,9 @@ use Exception;
 use Google\Auth\Credentials\ServiceAccountCredentials;
 use Google\Auth\HttpHandler\HttpHandlerFactory;
 use Google\Cloud\Dialogflow\V2\Value;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage; // Para guardar imágenes
+
 
 //imports de los handlers
 use App\Chatbot\IntentHandlerInterface;
@@ -72,6 +75,7 @@ class whatsappController extends Controller
         'ReservaCancha_QuiereModificar_Fecha' => ReservaCanchaOrquestadorHandler::class,
         'ReservaCancha_QuiereModificar_HoraInicio' => ReservaCanchaOrquestadorHandler::class,
         'ReservaCancha_QuiereModificar_DuracionOFin' => ReservaCanchaOrquestadorHandler::class,
+        'ReservaCancha_Enviar_Comprobante' => ReservaCanchaOrquestadorHandler::class,
 
         //UBMENÚS
         'Menu_Submenu_Wally' => \App\Http\Controllers\Chatbot\IntentHandlers\MenuWallyHandler::class, // Debes crear este handler
@@ -107,6 +111,7 @@ class whatsappController extends Controller
         'Zumba_Inscripcion_ConfirmarSi' => \App\Http\Controllers\Chatbot\IntentHandlers\InscribirClaseZumbaHandler::class,
         'Zumba_Inscripcion_Iniciar' => \App\Http\Controllers\Chatbot\IntentHandlers\InscribirClaseZumbaHandler::class,
         'Zumba_Inscripcion_SeleccionarClases' => \App\Http\Controllers\Chatbot\IntentHandlers\InscribirClaseZumbaHandler::class,
+        'Zumba_Inscripcion_Enviar_Comprobante' => \App\Http\Controllers\Chatbot\IntentHandlers\InscribirClaseZumbaHandler::class,
 
         // MAPEO MENU
         'Chatbot_Menu_Principal' => \App\Http\Controllers\Chatbot\IntentHandlers\MenuPrincipalHandler::class,
@@ -159,27 +164,29 @@ class whatsappController extends Controller
             if (isset($data['object']) && $data['object'] === 'whatsapp_business_account') {
                 if (isset($data['entry'][0]['changes'][0]['value']['messages'][0])) {
                     $messageData = $data['entry'][0]['changes'][0]['value']['messages'][0];
-                    $senderPhoneInput = $messageData['from']; // Para enviar respuesta a WhatsApp
-                    $normalizedSenderId = $this->normalizePhoneNumber($senderPhoneInput); // Para lógica interna y Dialogflow sessionId
+                    $senderPhoneInput = $messageData['from'];
+                    $normalizedSenderId = $this->normalizePhoneNumber($senderPhoneInput);
                     $messageText = null;
-                    $userProfileName = $data['entry'][0]['changes'][0]['value']['contacts'][0]['profile']['name'] ?? null; // Obtener nombre de perfil
+                    $userProfileName = $data['entry'][0]['changes'][0]['value']['contacts'][0]['profile']['name'] ?? null;
+                    $additionalParams = []; // <-- Usaremos esto para pasar media_id
 
+                    $messageTypeReceived = $messageData['type'] ?? null;
 
-                    if (($messageData['type'] ?? null) === 'text') {
+                    if ($messageTypeReceived === 'text') {
                         $messageText = $messageData['text']['body'];
-                    } elseif (($messageData['type'] ?? null) === 'interactive') {
-                        if (isset($messageData['interactive']['button_reply']['id'])) {
-                            $messageText = $messageData['interactive']['button_reply']['id'];
-                        } elseif (isset($messageData['interactive']['list_reply']['id'])) {
-                            $messageText = $messageData['interactive']['list_reply']['id'];
-                        }
+                    } elseif ($messageTypeReceived === 'interactive' && isset($messageData['interactive']['button_reply']['id'])) {
+                        $messageText = $messageData['interactive']['button_reply']['id'];
+                    } elseif ($messageTypeReceived === 'image') { // <-- DETECTAR IMAGEN
+                        $messageText = "comprobante_imagen_enviada"; // Texto genérico para activar el intent correcto
+                        $additionalParams['media_id'] = $messageData['image']['id'] ?? null;
+                        $additionalParams['mime_type'] = $messageData['image']['mime_type'] ?? null;
+                        Log::info("[WhatsappController] Imagen recibida de {$senderPhoneInput}. Media ID: {$additionalParams['media_id']}");
                     }
 
                     if ($messageText !== null) {
-                        Log::info("Processing input for Dialogflow from {$normalizedSenderId} (original: {$senderPhoneInput}): {$messageText}");
+                        Log::info("Processing input for Dialogflow from {$normalizedSenderId}: {$messageText}");
 
-                        $handlerResponse = $this->processDialogflowAndHandleIntent($messageText, $normalizedSenderId, $userProfileName);
-
+                        $handlerResponse = $this->processDialogflowAndHandleIntent($messageText, $normalizedSenderId, $userProfileName, $additionalParams);
                         $messagesSent = false;
                         // -------- INICIO SECCIÓN CRÍTICA PARA CONTEXTOS --------
                         if ($handlerResponse) { // Asegurarse que $handlerResponse no es null
@@ -260,7 +267,7 @@ class whatsappController extends Controller
         return response()->json(['status' => 'ignored_method'], 200);
     }
 
-    private function processDialogflowAndHandleIntent(string $message, string $normalizedSenderId, ?string $userProfileName): ?array // Ahora puede devolver array o string
+    private function processDialogflowAndHandleIntent(string $message, string $normalizedSenderId, ?string $userProfileName, array $additionalParams = []): ?array
     {
         if (empty($this->projectId)) {
             Log::error("Dialogflow Project ID not set.");
@@ -319,10 +326,17 @@ class whatsappController extends Controller
                 $fulfillmentTextFromDialogflow = $queryResult['fulfillmentText'] ?? "Disculpa, no entendí bien.";
                 // $outputContextsFromDialogflow = $queryResult['outputContexts'] ?? []; // Estos son los que DF genera por sí mismo.
 
-                if ($userProfileName) {
+                if ($userProfileName)
                     $parameters['user_profile_name'] = $userProfileName;
+                $parameters['queryResult'] = $queryResult; // Para acceso completo en el handler
+
+                // -------- AÑADIR PARÁMETROS ADICIONALES (media_id, mime_type) --------
+                if (!empty($additionalParams)) {
+                    $parameters = array_merge($parameters, $additionalParams);
                 }
-                Log::info("Intent: {$detectedIntentName}, Action: '{$action}', Params: " . json_encode($parameters));
+                // ---------------------------------------------------------------------
+                Log::info("[PDI] Intent: {$detectedIntentName}, Action: '{$action}', Params (con adicionales): " . json_encode($parameters));
+
 
                 $handlerResponse = ['fulfillmentText' => $fulfillmentTextFromDialogflow, 'message_type' => 'text'];
 
@@ -391,6 +405,118 @@ class whatsappController extends Controller
             return ['fulfillmentText' => "Hubo una excepción conectando con el asistente.", 'message_type' => 'text'];
         }
     }
+    // LÓGICA PARA DESCARGAR LA IMAGEN (Puedes añadirla al final de tu whatsappController)
+// Esta es una implementación básica. En producción, considera moverla a un Servicio.
+    private function descargarYGuardarComprobante(string $mediaId, string $senderId): ?string
+    {
+        if (empty($this->wsToken)) {
+            Log::error("Token de WhatsApp no configurado para descargar media.");
+            return null;
+        }
+        // 1. Obtener la URL del medio desde la API de Meta
+        $urlMediaInfo = "https://graph.facebook.com/v22.0/{$mediaId}"; // Usa una versión reciente de la API
+        try {
+            $responseInfo = Http::withToken($this->wsToken)->get($urlMediaInfo);
+            if (!$responseInfo->successful()) {
+                Log::error("Error al obtener info del medio {$mediaId}: " . $responseInfo->body());
+                return null;
+            }
+            $mediaData = $responseInfo->json();
+            $downloadUrl = $mediaData['url'] ?? null;
+            if (!$downloadUrl) {
+                Log::error("No se encontró URL de descarga para media {$mediaId}.");
+                return null;
+            }
+
+            // 2. Descargar el contenido de la imagen
+            $imageContents = Http::withToken($this->wsToken)->get($downloadUrl)->body();
+            if (empty($imageContents)) {
+                Log::error("No se pudo descargar el contenido de la imagen desde {$downloadUrl}");
+                return null;
+            }
+
+            // 3. Guardar el archivo en tu storage
+            $extension = Str::startsWith($mediaData['mime_type'], 'image/png') ? 'png' : 'jpg';
+            $fileName = 'comprobante_reserva_' . $senderId . '_' . time() . '.' . $extension;
+            $path = 'comprobantes/reservas/' . $fileName; // Ruta relativa dentro del disco 'public'
+
+            // Usar el disco 'public' que normalmente enlaza a storage/app/public
+            Storage::disk('public')->put($path, $imageContents);
+            Log::info("Comprobante guardado en: " . $path);
+
+            return $path; // Devuelve la ruta relativa para guardarla en la BD
+
+        } catch (Exception $e) {
+            Log::error("Excepción al descargar imagen de WhatsApp {$mediaId}: " . $e->getMessage());
+            return null;
+        }
+    }
+    // --- MÉTODO PÚBLICO PARA DESCARGAR IMÁGENES ---
+    /**
+     * Descarga un archivo multimedia desde la API de Meta y lo guarda.
+     * Es público para que los handlers puedan llamarlo a través del service container.
+     *
+     * @param string $mediaId
+     * @return string|null La ruta relativa al disco 'public' donde se guardó, o null si falló.
+     */
+    public function descargarImagenWhatsapp(string $mediaId, string $claseOzumba): ?string
+    {
+        if (empty($this->wsToken)) {
+            Log::error("descargarImagenWhatsapp: Token de WhatsApp no configurado.");
+            return null;
+        }
+
+        // 1. Obtener la URL del medio desde la API de Meta
+        $urlMediaInfo = "https://graph.facebook.com/v22.0/{$mediaId}"; // Usa una versión de API reciente
+        try {
+            Log::info("[descargarImagenWhatsapp] Obteniendo info para Media ID: {$mediaId}");
+            $responseInfo = Http::withToken($this->wsToken)->get($urlMediaInfo);
+
+            if (!$responseInfo->successful()) {
+                Log::error("descargarImagenWhatsapp: Error al obtener info del medio {$mediaId}: " . $responseInfo->body());
+                return null;
+            }
+            $mediaData = $responseInfo->json();
+            $downloadUrl = $mediaData['url'] ?? null;
+            $mimeType = $mediaData['mime_type'] ?? 'image/jpeg'; // Default a jpeg si no viene
+
+            if (!$downloadUrl) {
+                Log::error("descargarImagenWhatsapp: No se encontró URL de descarga para media {$mediaId}.");
+                return null;
+            }
+
+            // 2. Descargar el contenido de la imagen
+            Log::info("[descargarImagenWhatsapp] Descargando desde URL: {$downloadUrl}");
+            $imageContents = Http::withToken($this->wsToken)->get($downloadUrl)->body();
+
+            if (empty($imageContents)) {
+                Log::error("descargarImagenWhatsapp: No se pudo descargar el contenido de la imagen desde {$downloadUrl}");
+                return null;
+            }
+
+            // 3. Guardar el archivo en tu storage
+            $extension = Str::after($mimeType, 'image/'); // Obtiene 'jpeg', 'png', etc.
+            $fileName = 'comprobante_' . Str::random(10) . '_' . time() . '.' . $extension;
+
+            if ($claseOzumba === 'zumba') {
+                $path = 'comprobantes/clases/' . $fileName;
+            } else {
+                $path = 'comprobantes/reservas/' . $fileName;
+            }
+
+
+            // Usar el disco 'public' que normalmente enlaza a storage/app/public
+            Storage::disk('public')->put($path, $imageContents);
+            Log::info("[descargarImagenWhatsapp] Comprobante guardado en disco 'public' en la ruta: " . $path);
+
+            return $path; // Devuelve la ruta relativa al disco para guardarla en la BD
+
+        } catch (Exception $e) {
+            Log::error("descargarImagenWhatsapp: Excepción al descargar imagen {$mediaId}: " . $e->getMessage());
+            return null;
+        }
+    }
+
     /**
      * Obtiene un token de acceso de Google usando las credenciales de servicio.
      * @return string|null El token de acceso o null si falla.

@@ -10,10 +10,10 @@ use Carbon\Carbon;
 
 class ConsultaDisponibilidadCanchaHandler implements IntentHandlerInterface
 {
-    private const HORA_INICIO_OPERACION = 8;
-    private const HORA_FIN_OPERACION = 22;
-    private const TOTAL_CANCHAS = 3;
-    protected $reservaService;
+    private const HORA_INICIO_OPERACION = 8; // Asegúrate que coincida con el Orquestador
+    private const HORA_FIN_OPERACION = 22;   // Asegúrate que coincida con el Orquestador
+    private const TOTAL_CANCHAS = 3;       // Número total de canchas
+    protected ReservaService $reservaService;
     private const CACHE_TTL_MINUTES = 30;
 
     public function __construct(ReservaService $reservaService)
@@ -24,99 +24,41 @@ class ConsultaDisponibilidadCanchaHandler implements IntentHandlerInterface
     private function normalizePhoneNumber(string $phoneNumber): string
     {
         if (strpos($phoneNumber, 'whatsapp:+') === 0) {
-            return substr($phoneNumber, strlen('whatsapp:+'));
+            return substr($phoneNumber, strlen('whatsapp:'));
         }
         return preg_replace('/[^0-9+]/', '', $phoneNumber);
     }
 
-    public function handle(array $parameters, string $senderId, ?string $action = null): string // Devuelve string
+    public function handle(array $parameters, string $senderId, ?string $action = null): array // Cambiado para devolver array
     {
-        $telefonoNormalizado = $this->normalizePhoneNumber($senderId);
-        $reservaCacheKey = 'reserva_cache_' . $telefonoNormalizado;
-        $datosReservaEnCache = Cache::get($reservaCacheKey, []);
-        $datosReservaEnCache = array_merge([
-            'fecha' => null,
-            'hora_inicio' => null,
-            'paso_actual' => 'inicio',
-        ], $datosReservaEnCache);
-
+        // El senderId ya debería venir normalizado desde whatsappController
         Log::info('[ConsultaDisponibilidadHandler] Ejecutando. Sender: ' . $senderId . '. Params: ', $parameters);
-        Log::debug('[ConsultaDisponibilidadHandler] Caché inicial: ', $datosReservaEnCache);
 
         $fechaParam = $parameters['fecha'] ?? null;
-        $horaInicioParam = $parameters['horaini'] ?? null; // Dialogflow puede enviar 'horaini'
+        if (!$fechaParam) {
+            // Este handler ahora es llamado por el Orquestador, que siempre debería proveer la fecha.
+            // Si se llama directamente sin fecha, devolvemos un error.
+            return [
+                'fulfillmentText' => "Por favor, indica para qué fecha quieres consultar la disponibilidad.",
+                'message_type' => 'text',
+                'payload' => [],
+                'outputContextsToSetActive' => []
+            ];
+        }
 
-        $fechaConsulta = null;
-        $horaInicioConsultaObj = null;
-
-        if ($fechaParam) {
-            try {
-                $fechaConsulta = Carbon::parse($fechaParam)->startOfDay();
-                $datosReservaEnCache['fecha'] = $fechaConsulta->toDateString();
-            } catch (\Exception $e) {
-                Log::warning("[ConsultaDisponibilidadHandler] Fecha inválida en parámetro: {$fechaParam}");
-                // No hacer nada, se pedirá más adelante si es necesario
+        try {
+            $fechaConsulta = Carbon::parse($fechaParam)->startOfDay();
+            if ($fechaConsulta->isPast() && !$fechaConsulta->isToday()) {
+                return ['fulfillmentText' => "No puedes consultar disponibilidad para fechas pasadas.", 'message_type' => 'text'];
             }
-        } elseif ($datosReservaEnCache['fecha']) {
-            $fechaConsulta = Carbon::parse($datosReservaEnCache['fecha'])->startOfDay();
-        }
-
-        if ($horaInicioParam) {
-            try {
-                $horaInicioConsultaObj = Carbon::parse($horaInicioParam);
-                $datosReservaEnCache['hora_inicio'] = $horaInicioConsultaObj->format('H:i:s');
-            } catch (\Exception $e) {
-                Log::warning("[ConsultaDisponibilidadHandler] Hora inicio inválida en parámetro: {$horaInicioParam}");
-            }
-        } elseif ($datosReservaEnCache['hora_inicio']) {
-            try {
-                $horaInicioConsultaObj = Carbon::parse($datosReservaEnCache['hora_inicio']);
-            } catch (\Exception $e) {
-                // Si la hora en caché es inválida, la limpiamos para que se vuelva a pedir si es necesario.
-                $datosReservaEnCache['hora_inicio'] = null;
-            }
-        }
-
-        // Si después de procesar parámetros y caché, no tenemos fecha, la pedimos.
-        if (!$fechaConsulta) {
-            $datosReservaEnCache['paso_actual'] = 'esperando_fecha'; // Indicar que el próximo input debe ser una fecha
-            Cache::put($reservaCacheKey, $datosReservaEnCache, now()->addMinutes(self::CACHE_TTL_MINUTES));
-            Log::debug('[ConsultaDisponibilidadHandler] Solicitando fecha. Caché guardada: ', $datosReservaEnCache);
-            return "Por favor, ¿para qué fecha quieres consultar la disponibilidad? (Ej: mañana, próximo lunes)";
-        }
-
-        // Si la fecha es pasada (y no es hoy)
-        if ($fechaConsulta->isPast() && !$fechaConsulta->isToday()) {
-            unset($datosReservaEnCache['fecha']); // Limpiar fecha inválida
-            $datosReservaEnCache['paso_actual'] = 'esperando_fecha';
-            Cache::put($reservaCacheKey, $datosReservaEnCache, now()->addMinutes(self::CACHE_TTL_MINUTES));
-            Log::debug('[ConsultaDisponibilidadHandler] Fecha pasada. Solicitando nueva fecha. Caché guardada: ', $datosReservaEnCache);
-            return "Lo siento, no puedes consultar disponibilidad para fechas pasadas. Por favor, indica una fecha a partir de hoy.";
-        }
-
-        // Guardar el estado actual en caché (fecha y posiblemente hora_inicio)
-        // y el paso siguiente esperado.
-        if ($horaInicioConsultaObj) {
-            $datosReservaEnCache['paso_actual'] = 'esperando_hora_fin_o_duracion'; // Si ya tenemos fecha y hora_inicio
-        } else {
-            $datosReservaEnCache['paso_actual'] = 'esperando_hora_inicio'; // Si solo tenemos fecha
-        }
-        Cache::put($reservaCacheKey, $datosReservaEnCache, now()->addMinutes(self::CACHE_TTL_MINUTES));
-        Log::debug('[ConsultaDisponibilidadHandler] Fecha y/o hora procesadas. Caché actualizada: ', $datosReservaEnCache);
-
-        $fechaFormateadaUser = $fechaConsulta->locale('es')->isoFormat('dddd D [de] MMMM');
-        $respuesta = "";
-
-        if ($horaInicioConsultaObj) {
-            $respuesta .= "Disponibilidad para el {$fechaFormateadaUser} a partir de las " . $horaInicioConsultaObj->format('H:i') . ":\n";
-        } else {
-            $respuesta .= "Disponibilidad para el {$fechaFormateadaUser}:\n";
+        } catch (\Exception $e) {
+            Log::error("[ConsultaDisponibilidadHandler] Fecha inválida: {$fechaParam}. Error: " . $e->getMessage());
+            return ['fulfillmentText' => "No entendí la fecha que proporcionaste. Inténtalo de nuevo (ej. 'mañana', 'próximo martes').", 'message_type' => 'text'];
         }
 
         $reservasDelDia = $this->reservaService->getReservasConfirmadasPorFecha($fechaConsulta->toDateString());
-
         if ($reservasDelDia === null) {
-            return "Hubo un problema interno al consultar la disponibilidad. Por favor, intenta de nuevo más tarde.";
+            return ['fulfillmentText' => "Hubo un problema interno al consultar la disponibilidad. Intenta más tarde.", 'message_type' => 'text'];
         }
 
         $ocupacionPorHora = [];
@@ -124,7 +66,7 @@ class ConsultaDisponibilidadCanchaHandler implements IntentHandlerInterface
             $ocupacionPorHora[$h] = 0;
         }
 
-        if (is_array($reservasDelDia)) {
+        if (is_array($reservasDelDia) && !empty($reservasDelDia)) {
             foreach ($reservasDelDia as $reserva) {
                 try {
                     $inicioReserva = Carbon::parse($reserva['hora_inicio']);
@@ -144,30 +86,28 @@ class ConsultaDisponibilidadCanchaHandler implements IntentHandlerInterface
         }
 
         $horasDisponibles = [];
-        $filtroHoraInicio = $horaInicioConsultaObj ? $horaInicioConsultaObj->hour : self::HORA_INICIO_OPERACION;
-
-        for ($h = $filtroHoraInicio; $h < self::HORA_FIN_OPERACION; $h++) {
-            if ($fechaConsulta->isToday() && $h < Carbon::now()->hour) { // No mostrar horas pasadas para hoy
-                continue;
+        for ($h = self::HORA_INICIO_OPERACION; $h < self::HORA_FIN_OPERACION; $h++) {
+            if ($fechaConsulta->isToday() && $h < Carbon::now()->hour) {
+                continue; // No mostrar horas pasadas para hoy
             }
             if (isset($ocupacionPorHora[$h]) && $ocupacionPorHora[$h] < self::TOTAL_CANCHAS) {
                 $horasDisponibles[] = sprintf('%02d:00', $h);
             }
         }
 
+        $fulfillmentText = "";
         if (empty($horasDisponibles)) {
-            $respuesta .= "Lo siento, no quedan horas disponibles ";
-            if ($horaInicioConsultaObj) {
-                $respuesta .= "a partir de las " . $horaInicioConsultaObj->format('H:i') . ".";
-            } else {
-                $respuesta .= "para esta fecha.";
-            }
-            $respuesta .= "\n¿Te gustaría consultar otra fecha u hora?";
+            $fulfillmentText = "Lo siento, no quedan horas disponibles para el " . $fechaConsulta->locale('es')->isoFormat('dddd D [de] MMMM') . ".";
         } else {
-            $respuesta .= "Horas con al menos una cancha disponible (inicio de hora):\n";
-            $respuesta .= implode("\n", $horasDisponibles);
-            $respuesta .= "\n\nSi deseas reservar, dime la hora que te interesa?";
+            $fulfillmentText = "Horas con al menos una cancha disponible (inicio de hora):\n" . implode("\n", $horasDisponibles);
         }
-        return $respuesta;
+
+        // Devolver el formato de respuesta estándar
+        return [
+            'fulfillmentText' => $fulfillmentText,
+            'message_type' => 'text',
+            'payload' => [],
+            'outputContextsToSetActive' => [] // Este handler no necesita gestionar contextos de flujo por sí mismo
+        ];
     }
 }

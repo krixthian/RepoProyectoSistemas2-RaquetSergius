@@ -22,71 +22,55 @@ class ConsultarProximaClaseZumbaHandler implements IntentHandlerInterface
     {
         Log::info("[ConsultarProximaClaseZumbaHandler] Executing for senderId: {$senderId}");
         Carbon::setLocale('es');
-        $cliente = $this->clienteService->findClienteByTelefono($senderId); // senderId ya normalizado
-
-        $messages = [];
-        $outputContextsToSetActive = [];
+        $cliente = $this->clienteService->findClienteByTelefono($senderId);
 
         if (!$cliente) {
-            $messages[] = ['fulfillmentText' => "No pude encontrarte en el sistema. ¿Ya te has registrado o inscrito a alguna clase?", 'message_type' => 'text', 'payload' => []];
-        } else {
-            $hoy = Carbon::today();
-            $proximosSieteDiasConFechaYDia = [];
-            for ($i = 0; $i < 7; $i++) {
-                $dia = $hoy->copy()->addDays($i);
-                $proximosSieteDiasConFechaYDia[ucfirst($dia->locale('es_ES')->dayName)] = $dia->toDateString();
-            }
+            return $this->prepararRespuesta("No pude encontrarte en el sistema.");
+        }
 
-            // Obtener las inscripciones activas del cliente
-            $inscripciones = InscripcionClase::where('cliente_id', $cliente->cliente_id)
-                ->where('estado', 'Activa')
-                ->with(['claseZumba.instructor', 'claseZumba.area'])
-                ->get();
+        $hoy = Carbon::today();
+        $inscripciones = InscripcionClase::where('cliente_id', $cliente->cliente_id)
+            ->whereIn('estado', ['Activa', 'Pendiente']) // Mostrar ambos estados
+            ->where('fecha_clase', '>=', $hoy->toDateString())
+            ->with(['claseZumba.instructor', 'claseZumba.area'])
+            ->orderBy('fecha_clase', 'asc')
+            ->orderByRaw('TIME((SELECT hora_inicio FROM clases_zumba WHERE clases_zumba.clase_id = inscripciones_clase.clase_id)) asc')
+            ->take(5)
+            ->get();
 
-            $proximasClasesTextArray = [];
+        if ($inscripciones->isEmpty()) {
+            return $this->prepararRespuesta("Hola {$cliente->nombre}, no tienes inscripciones próximas a clases de Zumba.");
+        }
 
-            if ($inscripciones->isEmpty()) {
-                $messages[] = ['fulfillmentText' => "Hola {$cliente->nombre}, no tienes inscripciones activas a clases de Zumba.", 'message_type' => 'text', 'payload' => []];
-            } else {
-                $mensaje = "Hola {$cliente->nombre}, estas son tus próximas clases de Zumba inscritas (en los próximos 7 días):\n";
-                foreach ($inscripciones as $inscripcion) {
-                    $clase = $inscripcion->claseZumba;
-                    if ($clase && isset($proximosSieteDiasConFechaYDia[$clase->diasemama])) {
-                        $fechaEspecificaClase = $proximosSieteDiasConFechaYDia[$clase->diasemama];
-                        $fechaHoraClase = Carbon::parse($fechaEspecificaClase . ' ' . $clase->hora_inicio->format('H:i:s'));
+        $mensaje = "Hola {$cliente->nombre}, estas son tus próximas inscripciones a clases de Zumba:\n";
+        foreach ($inscripciones as $inscripcion) {
+            $clase = $inscripcion->claseZumba;
+            if ($clase) {
+                $fechaClase = Carbon::parse($inscripcion->fecha_clase)->isoFormat('dddd D [de] MMMM');
+                $horaInicio = Carbon::parse($clase->hora_inicio)->format('H:i');
+                $precioClase = $clase->precio ?? $inscripcion->monto_pagado ?? 'N/D';
+                $estadoInscripcion = $inscripcion->estado === 'Activa' ? '✅ Confirmada' : '⏳ Pendiente de Pago';
 
-                        // Solo mostrar si es hoy más tarde o en el futuro dentro de los 7 días
-                        if ($fechaHoraClase->isFuture()) {
-                            $fechaFormateada = $fechaHoraClase->isoFormat('dddd D [de] MMMM');
-                            $horaInicio = $clase->hora_inicio->format('H:i');
-                            $horaFin = $clase->hora_fin->format('H:i');
-                            $instructorNombre = $clase->instructor->nombre ?? 'N/A';
-                            $areaNombre = $clase->area->nombre ?? 'N/A';
-                            $precioClase = $clase->precio ?? 'N/D';
-
-                            $proximasClasesTextArray[] =
-                                "\n- Para el *{$fechaFormateada}*\n" .
-                                "  Clase ID {$clase->clase_id} de {$horaInicio} a {$horaFin}\n" .
-                                "  Instructor: {$instructorNombre}\n" .
-                                "  Lugar: {$areaNombre}\n" .
-                                "  Precio: Bs. " . number_format((float) $precioClase, 2) . "\n" .
-                                "  (ID Inscripción para cancelar: *{$inscripcion->inscripcion_id}*)";
-                        }
-                    }
-                }
-
-                if (empty($proximasClasesTextArray)) {
-                    $mensaje = "Hola {$cliente->nombre}, no tienes inscripciones activas a clases de Zumba en los próximos 7 días.";
-                } else {
-                    $mensaje .= implode("\n", $proximasClasesTextArray);
-                }
-                $messages[] = ['fulfillmentText' => $mensaje, 'message_type' => 'text', 'payload' => []];
+                $mensaje .= "\n- Para el *{$fechaClase}* a las {$horaInicio}\n";
+                $mensaje .= "  Clase: ID {$clase->clase_id} con " . ($clase->instructor->nombre ?? 'N/A') . "\n";
+                $mensaje .= "  Precio: Bs. " . number_format((float) $precioClase, 2) . "\n";
+                $mensaje .= "  Estado: *{$estadoInscripcion}*\n";
+                $mensaje .= "  (ID Inscripción para cancelar: {$inscripcion->inscripcion_id})\n";
             }
         }
 
-        return [
-            'messages_to_send' => $messages,
-            'outputContextsToSetActive' => $outputContextsToSetActive
-        ];
+        return $this->prepararRespuesta($mensaje);
+    }
+    private function prepararRespuesta(string|array $fulfillmentTextOrMessages, array $outputContextsToSetActive = [], string $messageType = 'text', array $payload = []): array
+    {
+        $messages = [];
+        if (is_string($fulfillmentTextOrMessages)) {
+            $messages[] = ['fulfillmentText' => $fulfillmentTextOrMessages, 'message_type' => $messageType, 'payload' => $payload];
+        } elseif (is_array($fulfillmentTextOrMessages) && !empty($fulfillmentTextOrMessages) && isset($fulfillmentTextOrMessages[0]['fulfillmentText'])) {
+            $messages = $fulfillmentTextOrMessages; // Asume que ya es un array de mensajes
+        } else { // Fallback si la estructura no es la esperada
+            $messages[] = ['fulfillmentText' => "Se produjo un error al preparar la respuesta.", 'message_type' => 'text', 'payload' => []];
+        }
+        return ['messages_to_send' => $messages, 'outputContextsToSetActive' => $outputContextsToSetActive];
     }
 }

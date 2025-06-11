@@ -20,6 +20,7 @@ return new class extends Migration {
             $table->string('metodo_pago', 50)->nullable(); // varchar(50)
             $table->timestamp('fecha_pago')->nullable(); // timestamp
 
+            $table->string('ruta_comprobante_pago')->nullable();
 
             $table->foreign('clase_id')->references('clase_id')->on('clases_zumba');
             $table->foreign('cliente_id')->references('cliente_id')->on('clientes');

@@ -18,9 +18,16 @@ return new class extends Migration {
             $table->time('hora_inicio');
             $table->time('hora_fin');
             $table->decimal('monto', 10, 2);
-            $table->string('estado'); // "pendiente/confirmada/cancelada"
+            $table->string('estado', 50)->default('Pendiente de Pago');
+            //nuevos para el qr
+            $table->decimal('monto_total', 8, 2)->nullable();
+            $table->string('ruta_comprobante_pago')->nullable();
+
             $table->string('metodo_pago'); // "QR/efectivo"
             $table->boolean('pago_completo')->default(false);
+
+
+
 
             $table->timestamp('created_at')->default(DB::raw('CURRENT_TIMESTAMP'));
             $table->timestamp('updated_at')->default(DB::raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));

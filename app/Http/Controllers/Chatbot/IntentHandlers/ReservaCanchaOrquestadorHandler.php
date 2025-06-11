@@ -10,6 +10,14 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Carbon\Exceptions\InvalidFormatException;
+use App\Models\Reserva;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use URL;
+use App\Http\Controllers\Chatbot\whatsappController;
+use InvalidArgumentException;
+
+
 
 class ReservaCanchaOrquestadorHandler implements IntentHandlerInterface
 {
@@ -41,6 +49,12 @@ class ReservaCanchaOrquestadorHandler implements IntentHandlerInterface
         'nombre_cliente_temporal' => null,
         'confirmacion_pendiente' => false,
         'user_profile_name' => null,
+        'reserva_id_pendiente' => null,
+        'monto_reserva_pendiente' => null,
+        'decision_sobre_reserva_existente_tomada' => false, //
+        'previous_step_before_cancel_prompt' => null, //
+        'cliente_id' => null, // <--- NUEVO
+        'cliente_obj' => null, // <--- NUEVO
     ];
 
     private string $senderId;
@@ -57,14 +71,12 @@ class ReservaCanchaOrquestadorHandler implements IntentHandlerInterface
     }
 
     // --- Métodos de Gestión de Caché ---
-    private function loadSessionData(string $senderId): void
+    private function loadSessionData(string $normalizedSenderId): void
     {
-        $this->senderId = $this->normalizePhoneNumberInternal($senderId);
+        $this->senderId = $normalizedSenderId;
         $this->cacheKey = self::CACHE_KEY_PREFIX . $this->senderId;
         $cachedData = Cache::get($this->cacheKey);
-
         $defaultData = [
-            'current_flow' => 'reserva_cancha',
             'step' => 'inicio',
             'fecha' => null,
             'hora_inicio' => null,
@@ -73,14 +85,14 @@ class ReservaCanchaOrquestadorHandler implements IntentHandlerInterface
             'nombre_cliente_temporal' => null,
             'confirmacion_pendiente' => false,
             'user_profile_name' => null,
+            'decision_sobre_reserva_existente_tomada' => false,
+            'reserva_id_pendiente' => null,
+            'monto_reserva_pendiente' => null,
+            'previous_step_before_cancel_prompt' => null,
+            'cliente_id' => null,
+            'cliente_obj' => null, // <--- NUEVO
         ];
-
-        if ($cachedData) {
-            // Asegurarse de que todas las claves existan, fusionando con los defaults
-            $this->datosReserva = array_merge($defaultData, $cachedData);
-        } else {
-            $this->datosReserva = $defaultData;
-        }
+        $this->datosReserva = $cachedData ? array_merge($defaultData, $cachedData) : $defaultData; //
     }
 
     private function saveSessionData(): void
@@ -114,27 +126,37 @@ class ReservaCanchaOrquestadorHandler implements IntentHandlerInterface
     }
 
 
-    public function handle(array $parameters, string $senderId, ?string $action = null): array
+    public function handle(array $parameters, string $normalizedSenderId, ?string $action = null): array
     {
-        $this->loadSessionData($senderId);
-        Log::debug("[{$this->cacheKey}] Orquestador Invocado. Action: {$action}. Step Caché: {$this->datosReserva['step']}. Params:", $parameters);
+        $this->loadSessionData($normalizedSenderId); //
+        Log::debug("[{$this->cacheKey}] Orquestador Invocado. Action: {$action}. Step: {$this->datosReserva['step']}."); //
         Log::debug("[{$this->cacheKey}] Datos en caché ANTES de procesar:", $this->datosReserva);
 
         // Guardar user_profile_name si viene en los parámetros (del whatsappController)
-        if (isset($parameters['user_profile_name'])) {
-            $this->datosReserva['user_profile_name'] = $parameters['user_profile_name'];
+        if (isset($parameters['user_profile_name']) && empty($this->datosReserva['user_profile_name'])) { //
+            $this->datosReserva['user_profile_name'] = $parameters['user_profile_name']; //
+        }
+        if ($action === 'reservaCancha.confirmarNuevaReservaPeseAExistente') { //
+            $this->datosReserva['decision_sobre_reserva_existente_tomada'] = true; //
+            $this->datosReserva['step'] = 'esperando_fecha'; //
+            // Limpiar datos de reserva si venían con el intent iniciar //
+            $this->datosReserva['fecha'] = null;
+            $this->datosReserva['hora_inicio'] = null; //
+            $this->datosReserva['hora_fin'] = null;
+            $this->datosReserva['duracion'] = null; //
+        } else {
+            $this->procesarParametrosEntrantes($parameters);
         }
 
-        $this->procesarParametrosEntrantes($parameters);
+
         Log::debug("[{$this->cacheKey}] Datos en caché DESPUÉS de fusionar params:", $this->datosReserva);
 
-        $respuesta = $this->gestionarFlujoReserva($action, $parameters);
-
-        $this->saveSessionData();
+        $respuesta = $this->gestionarFlujoReserva($action, $parameters); //
+        $this->saveSessionData(); //
         Log::debug("[{$this->cacheKey}] Datos en caché GUARDADOS:", $this->datosReserva);
         Log::debug("[{$this->cacheKey}] Respuesta del Orquestador (para WhatsappController):", $respuesta);
 
-        return $respuesta;
+        return $respuesta; //
     }
 
     private function procesarParametrosEntrantes(array $parameters): void
@@ -226,426 +248,176 @@ class ReservaCanchaOrquestadorHandler implements IntentHandlerInterface
 
     private function gestionarFlujoReserva(?string $action, array $currentDialogflowParams): array
     {
-        // --- INICIO: Validación SIMPLE de Reserva Existente al Iniciar ---
-        // Esta validación se ejecuta si es la acción de iniciar o el step es 'inicio',
-        // no hay fecha aún, y no hemos pasado por la advertencia de reserva existente.
-        if (
-            ($action === 'reservaCancha.iniciar' || $this->datosReserva['step'] === 'inicio') &&
-            !$this->datosReserva['fecha'] &&
-            !isset($this->datosReserva['decision_sobre_reserva_existente_tomada'])
-        ) {
-
-            $userProfileName = $this->datosReserva['user_profile_name'];
-            $this->clearSessionData(); // Limpia para un nuevo flujo, pero preservamos el nombre de perfil
-            $this->datosReserva['user_profile_name'] = $userProfileName;
-
-            $cliente = $this->clienteService->findOrCreateByTelefono($this->senderId, ['nombre_perfil_whatsapp' => $this->datosReserva['user_profile_name']])['cliente'];
-
-            if ($cliente) {
-                $reservasActivas = $this->reservaService->getReservasActivasFuturasPorCliente($cliente->cliente_id);
-
-                if ($reservasActivas && !$reservasActivas->isEmpty()) {
-                    $this->datosReserva['step'] = 'finalizado_o_cancelado'; // Detener flujo de NUEVA reserva
-                    $mensaje = "Hola {$cliente->nombre}! Ya tienes " . ($reservasActivas->count() > 1 ? "reservas programadas" : "una reserva programada") . ":\n";
-                    foreach ($reservasActivas as $idx => $infoRes) {
-                        $fechaRes = Carbon::parse($infoRes->fecha)->locale('es')->isoFormat('dddd D [de] MMMM');
-                        $horaInicioRes = Carbon::parse($infoRes->hora_inicio)->format('H:i');
-                        $horaFinRes = Carbon::parse($infoRes->hora_fin)->format('H:i');
-                        $canchaNombre = $infoRes->cancha->nombre ?? 'N/A';
-                        $mensaje .= ($idx + 1) . ". {$canchaNombre} el {$fechaRes} de {$horaInicioRes} a {$horaFinRes}.\n";
-                    }
-                    $mensaje .= "\nSi deseas hacer otra reserva, primero debes gestionar o cancelar las existentes.";
-                    $contextos = $this->generarNombresContextosActivosParaLimpiar(['reserva_cancha_en_progreso', 'reserva_cancha_esperando_fecha']);
-                    return $this->prepararRespuesta($mensaje, $contextos, 'text');
-                }
-            }
-            $this->datosReserva['decision_sobre_reserva_existente_tomada'] = true; // Marcar que ya pasamos esta verificación
-        }
-        // --- FIN: Validación SIMPLE de Reserva Existente ---
-
-
-        if ($action === 'reservaCancha.iniciar' && !$this->datosReserva['fecha']) {
-            $this->datosReserva['step'] = 'esperando_fecha';
-        }
-        // --- VALIDACIÓN DE FECHA (SI EXISTE) ---
-        if ($this->datosReserva['fecha']) {
-            try {
-                $fechaCarbon = Carbon::parse($this->datosReserva['fecha'])->startOfDay();
-                $hoy = Carbon::today()->startOfDay();
-                $fechaLimite = $hoy->copy()->addDays(self::MAX_DIAS_ANTICIPACION_RESERVA);
-
-                if ($fechaCarbon->isPast() && !$fechaCarbon->isToday()) {
-                    $this->datosReserva['fecha'] = null;
-                    $this->datosReserva['hora_inicio'] = null; // Resetear también hora si la fecha es inválida
-                    $this->datosReserva['step'] = 'esperando_fecha';
-                    $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_fecha']);
-                    return $this->prepararRespuesta("La fecha que indicaste ({$fechaCarbon->locale('es')->isoFormat('D MMM')}) ya pasó. Por favor, indica una fecha a partir de hoy.", $contextos);
-                }
-                if ($fechaCarbon->gt($fechaLimite)) {
-                    $this->datosReserva['fecha'] = null;
-                    $this->datosReserva['hora_inicio'] = null;
-                    $this->datosReserva['step'] = 'esperando_fecha';
-                    $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_fecha']);
-                    $mensajeLimite = "Solo puedes reservar con un máximo de " . self::MAX_DIAS_ANTICIPACION_RESERVA . " días de anticipación (hasta el " . $fechaLimite->locale('es')->isoFormat('D [de] MMMM') . "). ¿Qué fecha eliges?";
-                    return $this->prepararRespuesta($mensajeLimite, $contextos);
-                }
-                // Si la fecha es válida y el step era 'esperando_fecha' o 'inicio', avanzamos a 'esperando_hora_inicio'.
-                // O si la acción fue 'reservaCancha.proporcionarFecha'.
-                if ($this->datosReserva['step'] === 'esperando_fecha' || $this->datosReserva['step'] === 'inicio' || $action === 'reservaCancha.proporcionarFecha') {
-                    $this->datosReserva['step'] = 'esperando_hora_inicio';
-                }
-            } catch (InvalidFormatException $e) {
-                $this->datosReserva['fecha'] = null;
-                $this->datosReserva['hora_inicio'] = null;
-                $this->datosReserva['step'] = 'esperando_fecha';
-                $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_fecha']);
-                return $this->prepararRespuesta("No entendí la fecha proporcionada. ¿Podrías decirla de nuevo? (Ej: mañana, próximo martes)", $contextos);
-            }
-        }
-        // --- FIN VALIDACIÓN DE FECHA ---
-
-
-        // Manejar acciones explícitas que pueden interrumpir el flujo secuencial
-        if ($action === 'reservaCancha.cancelar') {
+        // --- 1. MANEJAR ACCIONES EXPLÍCITAS Y DE ALTA PRIORIDAD ---
+        if ($action === 'reservaCancha.cancelar' || $action === 'reservaCancha.confirmarCancelacionProcesoSi') {
             $this->clearSessionData();
             $this->datosReserva['step'] = 'finalizado_o_cancelado';
-            return $this->prepararRespuesta("Entendido, he cancelado el proceso de reserva.", $this->generarNombresContextosActivosParaLimpiar(['reserva_cancha_en_progreso']), 'text');
+            return $this->prepararRespuesta("Entendido, he cancelado el proceso de reserva.", $this->generarNombresContextosActivosParaLimpiar(['reserva_cancha_en_progreso']));
         }
         if ($action === 'reservaCancha.confirmarSi' && $this->datosReserva['confirmacion_pendiente']) {
-            return $this->intentarCrearReserva();
+            return $this->iniciarFlujoDePago();
         }
         if ($action === 'reservaCancha.confirmarNo' && $this->datosReserva['confirmacion_pendiente']) {
             $this->datosReserva['confirmacion_pendiente'] = false;
             $this->datosReserva['step'] = 'modificando_reserva';
             $this->datosReserva['hora_fin'] = null;
             $this->datosReserva['duracion'] = null;
-            $contextos = $this->generarNombresContextosActivos(['reserva_cancha_modificando']);
-            return $this->prepararRespuesta("Entendido. ¿Qué deseas cambiar: la fecha, la hora de inicio, o la duración/hora de finalización?", $contextos);
+            return $this->prepararRespuesta("Entendido. ¿Qué deseas cambiar: la fecha, la hora de inicio, o la duración?", $this->generarNombresContextosActivos(['reserva_cancha_modificando']));
+        }
+        if ($action === 'reservaCancha.enviarComprobante') {
+            return $this->manejarComprobante($currentDialogflowParams);
         }
 
-        if ($this->datosReserva['step'] === 'listo_para_nombre_o_confirmacion' || $this->datosReserva['step'] === 'esperando_nombre') {
-            $nombreProporcionadoPorUsuario = $this->datosReserva['nombre_cliente_temporal'] ?? null;
-            $nombreDePerfilWhatsapp = $this->datosReserva['user_profile_name'] ?? null;
-
-            $datosParaClienteService = [];
-            if ($nombreProporcionadoPorUsuario) {
-                // Si el usuario ya dio un nombre explícitamente en este flujo, lo usamos.
-                $datosParaClienteService['nombre'] = $nombreProporcionadoPorUsuario;
-            } elseif ($nombreDePerfilWhatsapp) {
-                // Si no, usamos el nombre de perfil de WhatsApp como sugerencia para findOrCreate
-                $datosParaClienteService['nombre_perfil_whatsapp'] = $nombreDePerfilWhatsapp;
+        // --- 2. VERIFICACIÓN DE RESERVA EXISTENTE (SOLO AL INICIO) ---
+        if ($action === 'reservaCancha.iniciar' && !$this->datosReserva['decision_sobre_reserva_existente_tomada']) {
+            $this->datosReserva['decision_sobre_reserva_existente_tomada'] = true;
+            $cliente = $this->clienteService->findOrCreateByTelefono($this->senderId, ['nombre_perfil_whatsapp' => $this->datosReserva['user_profile_name']])['cliente'];
+            if ($cliente) {
+                $reservasActivas = $this->reservaService->getReservasActivasFuturasPorCliente($cliente->cliente_id);
+                if ($reservasActivas && !$reservasActivas->isEmpty()) {
+                    $this->datosReserva['step'] = 'esperando_decision_reserva_existente';
+                    $mensaje = "Hola " . ($cliente->nombre ?? 'estimado cliente') . "! Veo que ya tienes " . ($reservasActivas->count() > 1 ? "estas reservas" : "esta reserva") . ":\n";
+                    foreach ($reservasActivas as $idx => $infoRes) {
+                        $fechaRes = Carbon::parse($infoRes->fecha)->locale('es')->isoFormat('dddd D MMM');
+                        $horaInicioRes = Carbon::parse($infoRes->hora_inicio)->format('H:i');
+                        $horaFinRes = Carbon::parse($infoRes->hora_fin)->format('H:i');
+                        $canchaNombre = $infoRes->cancha->nombre ?? 'N/A';
+                        $mensaje .= ($idx + 1) . ". {$canchaNombre} el {$fechaRes} de {$horaInicioRes} a {$horaFinRes}.\n";
+                    }
+                    $mensaje .= "\n¿Aún así quieres hacer una nueva reserva?";
+                    $payload = ['buttons' => [['id' => 'si_proceder_nueva_reserva', 'title' => 'Sí, reservar otra'], ['id' => 'menu', 'title' => 'No, gracias']]];
+                    return $this->prepararRespuesta($mensaje, $this->generarNombresContextosActivos(['reserva_cancha_decision_nueva_pese_a_existente']), 'interactive_buttons', $payload);
+                }
             }
+        }
+        if ($action === 'reservaCancha.confirmarNuevaReservaPeseAExistente') {
+            $this->datosReserva['step'] = 'esperando_fecha';
+            $this->datosReserva['fecha'] = null;
+            $this->datosReserva['hora_inicio'] = null;
+            $this->datosReserva['hora_fin'] = null;
+            $this->datosReserva['duracion'] = null;
+        }
 
-            $resultadoCliente = $this->clienteService->findOrCreateByTelefono($this->senderId, $datosParaClienteService);
+        // --- 3. GESTIÓN SECUENCIAL DE DATOS FALTANTES ---
+
+        // 3.1 FECHA
+        if (empty($this->datosReserva['fecha'])) {
+            return $this->prepararRespuesta("Para tu reserva, ¿para qué fecha te gustaría? (Ej: mañana, próximo martes)", $this->generarNombresContextosActivos(['reserva_cancha_esperando_fecha']));
+        }
+        try {
+            $fechaCarbon = Carbon::parse($this->datosReserva['fecha'])->startOfDay();
+            $hoy = Carbon::today()->startOfDay();
+            $fechaLimite = $hoy->copy()->addDays(self::MAX_DIAS_ANTICIPACION_RESERVA);
+            if ($fechaCarbon->isPast() && !$fechaCarbon->isToday())
+                throw new InvalidArgumentException("Esa fecha ya pasó.");
+            if ($fechaCarbon->gt($fechaLimite))
+                throw new InvalidArgumentException("Solo puedes reservar con máximo " . self::MAX_DIAS_ANTICIPACION_RESERVA . " días de antelación (hasta el " . $fechaLimite->locale('es')->isoFormat('D MMM') . ").");
+        } catch (\Exception $e) {
+            $this->datosReserva['fecha'] = null;
+            return $this->prepararRespuesta($e->getMessage() . " Por favor, indica una fecha válida.", $this->generarNombresContextosActivos(['reserva_cancha_esperando_fecha']));
+        }
+
+        // 3.2 HORA DE INICIO
+        if (empty($this->datosReserva['hora_inicio'])) {
+            $handlerConsulta = app(ConsultaDisponibilidadCanchaHandler::class);
+            $respuestaConsultaArray = $handlerConsulta->handle(['fecha' => $this->datosReserva['fecha']], $this->senderId, 'consulta.disponibilidad');
+            $disponibilidadMsg = $respuestaConsultaArray['fulfillmentText'] ?? "Consultando disponibilidad...";
+            $fechaFormateada = Carbon::parse($this->datosReserva['fecha'])->locale('es')->isoFormat('dddd D [de] MMMM');
+            $mensaje = "Para el {$fechaFormateada}:\n{$disponibilidadMsg}\n\n¿A qué hora quieres iniciar tu reserva? (ej. 09:00, 14:30)";
+            return $this->prepararRespuesta($mensaje, $this->generarNombresContextosActivos(['reserva_cancha_esperando_hora_inicio']));
+        }
+        try {
+            $horaInicioCarbon = Carbon::parse($this->datosReserva['hora_inicio']);
+            if ($horaInicioCarbon->format('i') % self::INTERVALO_MINUTOS_RESERVA !== 0)
+                throw new InvalidArgumentException("La hora debe ser en intervalos de " . self::INTERVALO_MINUTOS_RESERVA . " min (ej: 08:00, 08:30).");
+            $horaDelDia = (int) $horaInicioCarbon->format('H');
+            $minutosDelDia = (int) $horaInicioCarbon->format('i');
+            $horaInicioAbsoluta = $horaDelDia * 60 + $minutosDelDia;
+            $horaAperturaAbsoluta = self::HORA_INICIO_OPERACION * 60;
+            $ultimaHoraInicioAbsoluta = (self::HORA_FIN_OPERACION * 60) - self::MIN_DURACION_RESERVA_MINUTOS;
+            if ($horaInicioAbsoluta < $horaAperturaAbsoluta || $horaInicioAbsoluta > $ultimaHoraInicioAbsoluta)
+                throw new InvalidArgumentException("Nuestro horario es de " . sprintf('%02d:00', self::HORA_INICIO_OPERACION) . " hasta las " . sprintf('%02d:00', self::HORA_FIN_OPERACION) . ".");
+            if (Carbon::parse($this->datosReserva['fecha'])->isToday() && $horaInicioCarbon->isPast())
+                throw new InvalidArgumentException("Esa hora ya pasó hoy.");
+        } catch (\Exception $e) {
+            $this->datosReserva['hora_inicio'] = null;
+            $mensajeError = ($e instanceof InvalidFormatException) ? "No entendí la hora que indicaste." : $e->getMessage();
+            return $this->prepararRespuesta($mensajeError . " Por favor, elige una hora válida.", $this->generarNombresContextosActivos(['reserva_cancha_esperando_hora_inicio']));
+        }
+
+        // 3.3 DURACIÓN / HORA FIN
+        if (empty($this->datosReserva['duracion']) && empty($this->datosReserva['hora_fin'])) {
+            $mensaje = "Perfecto, reserva para las " . Carbon::parse($this->datosReserva['hora_inicio'])->format('H:i') . ". ¿Por cuánto tiempo (ej: 1 hora, 1h 30m, máx 3h) o hasta qué hora?";
+            return $this->prepararRespuesta($mensaje, $this->generarNombresContextosActivos(['reserva_cancha_esperando_duracion_o_fin']));
+        }
+        try {
+            $this->calcularIntervaloCompleto();
+        } catch (InvalidArgumentException $e) {
+            $this->datosReserva['duracion'] = null;
+            $this->datosReserva['hora_fin'] = null;
+            return $this->prepararRespuesta($e->getMessage() . " Por favor, indícalo de nuevo.", $this->generarNombresContextosActivos(['reserva_cancha_esperando_duracion_o_fin']));
+        }
+
+        // 3.4 CLIENTE (ID y Objeto)
+        if (empty($this->datosReserva['cliente_id'])) {
+            $datosParaFind = ['nombre_perfil_whatsapp' => $this->datosReserva['user_profile_name'] ?? null];
+            $resultadoCliente = $this->clienteService->findOrCreateByTelefono($this->senderId, $datosParaFind);
             $cliente = $resultadoCliente['cliente'];
-
             if (!$cliente) {
                 $this->clearSessionData();
-                $this->datosReserva['step'] = 'finalizado_o_cancelado';
                 return $this->prepararRespuesta("Hubo un problema al identificarte. Por favor, intenta de nuevo más tarde.", $this->generarNombresContextosActivosParaLimpiar(['reserva_cancha_en_progreso']));
             }
+            $this->datosReserva['cliente_id'] = $cliente->cliente_id;
+            $this->datosReserva['cliente_obj'] = $cliente;
 
-            // Caso 1: El cliente es nuevo Y no tenemos un nombre válido para él (ni del perfil ni proporcionado)
-            // O el cliente existe pero NO tiene nombre, Y el usuario aún no ha proporcionado uno en este flujo.
-            if (($resultadoCliente['is_new_requiring_data'] || (isset($cliente->nombre) && empty($cliente->nombre))) && empty($nombreProporcionadoPorUsuario)) {
+            // Si es nuevo y no se pudo obtener un buen nombre, o si es existente sin nombre, pedirlo.
+            if ($resultadoCliente['is_new_requiring_data'] || empty($cliente->nombre)) {
                 $this->datosReserva['step'] = 'esperando_nombre';
-                $mensajeNombre = "Para completar tu reserva, necesito tu nombre completo por favor:";
-                if ($resultadoCliente['is_new_requiring_data']) {
-                    $mensajeNombre = "Como eres un nuevo cliente, ¿podrías decirme tu nombre completo para registrarte y completar la reserva?";
-                } else if (empty($cliente->nombre)) {
-                    $mensajeNombre = "Veo que ya estás registrado, pero no tenemos tu nombre. ¿Podrías proporcionármelo para la reserva?";
-                }
-                $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_nombre']);
-                return $this->prepararRespuesta($mensajeNombre, $contextos);
-            }
-
-            // Caso 2: El usuario proporcionó un nombre explícitamente en este flujo ('nombre_cliente_temporal')
-            // Y este nombre es diferente al que ya tiene el cliente (o el cliente no tenía nombre).
-            // Aquí SÍ actualizamos.
-            if ($nombreProporcionadoPorUsuario && (!isset($cliente->nombre) || $nombreProporcionadoPorUsuario !== $cliente->nombre)) {
-                Log::info("[{$this->cacheKey}] Actualizando nombre del cliente ID {$cliente->cliente_id} a '{$nombreProporcionadoPorUsuario}' basado en entrada del flujo.");
-                $this->clienteService->actualizarDatosCliente($this->senderId, ['nombre' => $nombreProporcionadoPorUsuario]);
-                $cliente->refresh(); // Actualizar el objeto cliente
-            }
-            $this->datosReserva['step'] = 'esperando_confirmacion';
-        }
-
-
-        if ($this->datosReserva['step'] === 'modificando_reserva') {
-            if ($action === 'reservaCancha.quiereModificarFecha') {
-                $this->datosReserva['fecha'] = null;
-                $this->datosReserva['hora_inicio'] = null;
-                $this->datosReserva['hora_fin'] = null;
-                $this->datosReserva['duracion'] = null;
-                $this->datosReserva['step'] = 'esperando_fecha';
-            } elseif ($action === 'reservaCancha.quiereModificarHoraInicio') {
-                $this->datosReserva['hora_inicio'] = null;
-                $this->datosReserva['hora_fin'] = null;
-                $this->datosReserva['duracion'] = null;
-                $this->datosReserva['step'] = 'esperando_hora_inicio';
-                if (!$this->datosReserva['fecha']) {
-                    $this->datosReserva['step'] = 'esperando_fecha';
-                }
-            } elseif ($action === 'reservaCancha.quiereModificarDuracionOFin') {
-                $this->datosReserva['hora_fin'] = null;
-                $this->datosReserva['duracion'] = null;
-                $this->datosReserva['step'] = 'esperando_duracion_o_fin';
-                if (!$this->datosReserva['fecha']) {
-                    $this->datosReserva['step'] = 'esperando_fecha';
-                } elseif (!$this->datosReserva['hora_inicio']) {
-                    $this->datosReserva['step'] = 'esperando_hora_inicio';
-                }
-            } else {
-                $contextos = $this->generarNombresContextosActivos(['reserva_cancha_modificando']);
-                return $this->prepararRespuesta("No entendí qué quieres cambiar. Puedes decir 'la fecha', 'la hora' o 'la duración'.", $contextos);
+                $mensajeNombre = "Para completar tu reserva, ¿podrías indicarme tu nombre completo?";
+                return $this->prepararRespuesta($mensajeNombre, $this->generarNombresContextosActivos(['reserva_cancha_esperando_nombre']));
             }
         }
 
-        // Si el step es 'inicio' y ya pasamos la validación de reserva activa (o no aplica) y no hay fecha, ponemos step a 'esperando_fecha'
-        if ($this->datosReserva['step'] === 'inicio' && !$this->datosReserva['fecha']) {
-            $this->datosReserva['step'] = 'esperando_fecha';
-        }
-
-        // 1. PROCESAR/PEDIR FECHA
-        if ($this->datosReserva['step'] === 'esperando_fecha') {
-            if (!$this->datosReserva['fecha'] && isset($currentDialogflowParams['fecha'])) { // Tomar de params si se proporcionó con la acción de iniciar o fecha
-                try {
-                    $this->datosReserva['fecha'] = Carbon::parse($currentDialogflowParams['fecha'])->toDateString();
-                } catch (InvalidFormatException $e) { /* se manejará abajo */
-                }
-            }
-
-            if (!$this->datosReserva['fecha']) {
-                $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_fecha']);
-                return $this->prepararRespuesta("Para tu reserva, ¿para qué fecha te gustaría? (Ej: mañana, " . Carbon::today()->addDays(2)->locale('es')->isoFormat('D [de] MMMM') . ")", $contextos);
-            }
-
-            try {
-                $fechaCarbon = Carbon::parse($this->datosReserva['fecha'])->startOfDay();
-                $hoy = Carbon::today()->startOfDay();
-                $fechaLimite = $hoy->copy()->addDays(self::MAX_DIAS_ANTICIPACION_RESERVA);
-
-                if ($fechaCarbon->isPast() && !$fechaCarbon->isToday()) {
-                    $this->datosReserva['fecha'] = null; // Limpiar y volver a pedir
-                    $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_fecha']);
-                    return $this->prepararRespuesta("Esa fecha ya pasó. Por favor, indica una fecha a partir de hoy.", $contextos);
-                }
-                if ($fechaCarbon->gt($fechaLimite)) {
-                    $this->datosReserva['fecha'] = null; // Limpiar y volver a pedir
-                    $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_fecha']);
-                    $mensajeLimite = "Solo puedes reservar con un máximo de " . self::MAX_DIAS_ANTICIPACION_RESERVA . " días de anticipación. La última fecha sería el " . $fechaLimite->locale('es')->isoFormat('D [de] MMMM') . ". ¿Qué fecha eliges?";
-                    return $this->prepararRespuesta($mensajeLimite, $contextos);
-                }
-                $this->datosReserva['fecha'] = $fechaCarbon->toDateString(); // Guardar normalizada
-                $this->datosReserva['step'] = 'esperando_hora_inicio'; // Avanzar
-            } catch (InvalidFormatException $e) {
-                $this->datosReserva['fecha'] = null;
-                $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_fecha']);
-                return $this->prepararRespuesta("No entendí la fecha. ¿Podrías decirla de nuevo? (Ej: mañana, próximo martes)", $contextos);
-            }
-        }
-
-        // 2. PROCESAR/PEDIR HORA DE INICIO
-        if ($this->datosReserva['step'] === 'esperando_hora_inicio') {
-            if (!$this->datosReserva['hora_inicio'] && (isset($currentDialogflowParams['hora_inicio']) || isset($currentDialogflowParams['horaini']))) {
-                try {
-                    $this->datosReserva['hora_inicio'] = Carbon::parse($currentDialogflowParams['hora_inicio'] ?? $currentDialogflowParams['horaini'])->format('H:i:s');
-                } catch (InvalidFormatException $e) { /* se manejará abajo */
-                }
-            }
-
-            if (!$this->datosReserva['hora_inicio']) {
-                $disponibilidadMsg = $this->consultaDisponibilidadHandler->handle(['fecha' => $this->datosReserva['fecha']], $this->senderId, 'consulta.disponibilidad');
-                $fechaFormateada = Carbon::parse($this->datosReserva['fecha'])->locale('es')->isoFormat('dddd D [de] MMMM');
-                $mensaje = "Para el {$fechaFormateada}:\n{$disponibilidadMsg}\n\n¿A qué hora quieres iniciar tu reserva? (ej. 09:00, 14:30)";
-                $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_hora_inicio']);
-                return $this->prepararRespuesta($mensaje, $contextos, 'text');
-            }
-
-            try {
-                $horaInicioCarbon = Carbon::parse($this->datosReserva['hora_inicio']); // Formato H:i:s
-                $minutos = (int) $horaInicioCarbon->format('i');
-
-                if ($minutos % self::INTERVALO_MINUTOS_RESERVA !== 0) {
-                    $this->datosReserva['hora_inicio'] = null;
-                    $mensajeError = "La hora de inicio debe ser en intervalos de " . self::INTERVALO_MINUTOS_RESERVA . " minutos (ej: 08:00, 08:30). ";
-                    $disponibilidadMsg = $this->consultaDisponibilidadHandler->handle(['fecha' => $this->datosReserva['fecha']], $this->senderId, 'consulta.disponibilidad');
-                    $fechaFormateada = Carbon::parse($this->datosReserva['fecha'])->locale('es')->isoFormat('dddd D [de] MMMM');
-                    $mensajeCompleto = "Para el {$fechaFormateada}:\n{$disponibilidadMsg}\n\nPor favor, ¿a qué hora quieres iniciar?";
-                    $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_hora_inicio']);
-                    return $this->prepararRespuesta($mensajeCompleto, $contextos);
-                }
-
-                $horaDelDia = (int) $horaInicioCarbon->format('H');
-                $minutosDelDia = (int) $horaInicioCarbon->format('i');
-                $horaInicioAbsoluta = $horaDelDia * 60 + $minutosDelDia;
-                $horaAperturaAbsoluta = self::HORA_INICIO_OPERACION * 60;
-                // Última hora para empezar y completar la duración mínima sin pasar HORA_FIN_OPERACION
-                $horaCierreAbsoluta = self::HORA_FIN_OPERACION * 60;
-                $ultimaHoraInicioAbsoluta = $horaCierreAbsoluta - self::MIN_DURACION_RESERVA_MINUTOS;
-
-
-                if ($horaInicioAbsoluta < $horaAperturaAbsoluta || $horaInicioAbsoluta > $ultimaHoraInicioAbsoluta) {
-                    $this->datosReserva['hora_inicio'] = null;
-                    $mensajeError = "Nuestras horas de reserva son de " . sprintf('%02d:00', self::HORA_INICIO_OPERACION) . " a " . sprintf('%02d:%02d', floor($ultimaHoraInicioAbsoluta / 60), $ultimaHoraInicioAbsoluta % 60) . " (para terminar a las " . sprintf('%02d:00', self::HORA_FIN_OPERACION) . "). ";
-                    $disponibilidadMsg = $this->consultaDisponibilidadHandler->handle(['fecha' => $this->datosReserva['fecha']], $this->senderId, 'consulta.disponibilidad');
-                    $fechaFormateada = Carbon::parse($this->datosReserva['fecha'])->locale('es')->isoFormat('dddd D [de] MMMM');
-                    $mensajeCompleto = $mensajeError . "Para el {$fechaFormateada}:\n{$disponibilidadMsg}\n\n¿Qué hora eliges?";
-                    $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_hora_inicio']);
-                    return $this->prepararRespuesta($mensajeCompleto, $contextos);
-                }
-
-                if (Carbon::parse($this->datosReserva['fecha'])->isToday() && $horaInicioCarbon->isPast()) {
-                    $this->datosReserva['hora_inicio'] = null;
-                    $mensajeError = "Esa hora ya pasó hoy. ";
-                    $disponibilidadMsg = $this->consultaDisponibilidadHandler->handle(['fecha' => $this->datosReserva['fecha']], $this->senderId, 'consulta.disponibilidad');
-                    $fechaFormateada = Carbon::parse($this->datosReserva['fecha'])->locale('es')->isoFormat('dddd D [de] MMMM');
-                    $mensajeCompleto = $mensajeError . "Para el {$fechaFormateada}:\n{$disponibilidadMsg}\n\nPor favor, ¿a qué hora quieres iniciar?";
-                    $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_hora_inicio']);
-                    return $this->prepararRespuesta($mensajeCompleto, $contextos);
-                }
-
-                $this->datosReserva['hora_inicio'] = $horaInicioCarbon->format('H:i:s');
-                $this->datosReserva['step'] = 'esperando_duracion_o_fin';
-            } catch (InvalidFormatException $e) {
-                $this->datosReserva['hora_inicio'] = null;
-                $disponibilidadMsg = $this->consultaDisponibilidadHandler->handle(['fecha' => $this->datosReserva['fecha']], $this->senderId, 'consulta.disponibilidad');
-                $fechaFormateada = Carbon::parse($this->datosReserva['fecha'])->locale('es')->isoFormat('dddd D [de] MMMM');
-                $mensaje = "La hora de inicio no es válida. Para el {$fechaFormateada}:\n{$disponibilidadMsg}\n\nPor favor, ¿a qué hora quieres iniciar?";
-                $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_hora_inicio']);
-                return $this->prepararRespuesta($mensaje, $contextos);
-            }
-        }
-
-        // 3. PROCESAR/PEDIR DURACIÓN O HORA DE FIN
-        if ($this->datosReserva['step'] === 'esperando_duracion_o_fin') {
-            if (empty($this->datosReserva['duracion']) && empty($this->datosReserva['hora_fin'])) {
-                // Tomar de los parámetros si se proporcionó con la acción de hora inicio, duración o fin
-                if (isset($currentDialogflowParams['duracion'])) {
-                    $this->datosReserva['duracion'] = $currentDialogflowParams['duracion'];
-                } elseif (isset($currentDialogflowParams['hora_fin']) || isset($currentDialogflowParams['horafin'])) {
-                    $this->datosReserva['hora_fin'] = $currentDialogflowParams['hora_fin'] ?? $currentDialogflowParams['horafin'];
-                }
-            }
-
-            if (empty($this->datosReserva['duracion']) && empty($this->datosReserva['hora_fin'])) {
-                $fechaFormateada = Carbon::parse($this->datosReserva['fecha'])->locale('es')->isoFormat('D [de] MMMM');
-                $horaInicioFormateada = Carbon::parse($this->datosReserva['hora_inicio'])->format('H:i');
-                $mensaje = "Reserva para el {$fechaFormateada} a las {$horaInicioFormateada}. ¿Por cuánto tiempo (ej: 1 hora, 1h 30m, máx 3h) o hasta qué hora?";
-                $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_duracion_o_fin']);
-                return $this->prepararRespuesta($mensaje, $contextos);
-            }
-            try {
-                $this->calcularIntervaloCompleto(); // Este método ahora incluye todas las validaciones de duración y hora fin
-                $this->datosReserva['step'] = 'listo_para_nombre_o_confirmacion';
-            } catch (\InvalidArgumentException $e) {
-                $this->datosReserva['duracion'] = null;
-                $this->datosReserva['hora_fin'] = null;
-                $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_duracion_o_fin']);
-                return $this->prepararRespuesta($e->getMessage() . " Por favor, indícalo de nuevo.", $contextos);
-            }
-        }
-
-        // 4. DECIDIR SI PEDIR NOMBRE O IR A CONFIRMACIÓN
-        if ($this->datosReserva['step'] === 'listo_para_nombre_o_confirmacion') {
-            // ... (lógica para obtener $cliente como la tenías) ...
-            $datosClientePayload = [];
-            if (!empty($this->datosReserva['nombre_cliente_temporal'])) {
-                $datosClientePayload['nombre'] = $this->datosReserva['nombre_cliente_temporal'];
-            } elseif (!empty($this->datosReserva['user_profile_name'])) {
-                $datosClientePayload['nombre_perfil_whatsapp'] = $this->datosReserva['user_profile_name'];
-            }
-            $resultadoCliente = $this->clienteService->findOrCreateByTelefono($this->senderId, $datosClientePayload);
-            $cliente = $resultadoCliente['cliente'];
-
-            if (!$cliente) { /* ... (manejar error de cliente) ... */
-            }
-
-            // Actualizar nombre de perfil si no teníamos nombre explícito aún y el cliente no tiene nombre
-            if (empty($this->datosReserva['nombre_cliente_temporal']) && !empty($this->datosReserva['user_profile_name']) && empty($cliente->nombre)) {
-                $this->clienteService->actualizarDatosCliente($this->senderId, ['nombre' => $this->datosReserva['user_profile_name']]);
-                $cliente->refresh();
-            }
-
-            if (($resultadoCliente['is_new_requiring_data'] || empty($cliente->nombre)) && empty($this->datosReserva['nombre_cliente_temporal'])) {
-                $this->datosReserva['step'] = 'esperando_nombre';
-            } else {
-                $this->datosReserva['step'] = 'esperando_confirmacion';
-            }
-        }
-
-        // 5. PROCESAR/PEDIR NOMBRE
+        // 3.5 NOMBRE DEL CLIENTE (si se pidió explícitamente)
         if ($this->datosReserva['step'] === 'esperando_nombre') {
-            if (empty($this->datosReserva['nombre_cliente_temporal']) && (isset($currentDialogflowParams['nombre_cliente']) || (isset($currentDialogflowParams['person']) && isset($currentDialogflowParams['person']['name'])))) {
-                $nombreTemp = $currentDialogflowParams['nombre_cliente'] ?? $currentDialogflowParams['person']['name'];
-                $this->datosReserva['nombre_cliente_temporal'] = trim($nombreTemp);
-            }
-
             if (empty($this->datosReserva['nombre_cliente_temporal'])) {
-                $mensajeNombre = "Para completar tu reserva, necesito tu nombre completo por favor:";
-                $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_nombre']);
-                return $this->prepararRespuesta($mensajeNombre, $contextos);
+                return $this->prepararRespuesta("Por favor, necesito tu nombre completo para continuar.", $this->generarNombresContextosActivos(['reserva_cancha_esperando_nombre']));
             }
-            if (!preg_match('/[a-zA-ZÁÉÍÓÚáéíóúÑñ\s]{3,}/', $this->datosReserva['nombre_cliente_temporal'])) { // Validación simple
+            if (!preg_match('/[a-zA-ZÁÉÍÓÚáéíóúÑñ\s]{3,}/', $this->datosReserva['nombre_cliente_temporal'])) {
                 $this->datosReserva['nombre_cliente_temporal'] = null;
-                $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_nombre']);
-                return $this->prepararRespuesta("Ese nombre no parece válido. Por favor, ingresa tu nombre y apellido.", $contextos);
+                return $this->prepararRespuesta("Ese nombre no parece válido. Por favor, ingresa tu nombre y apellido.", $this->generarNombresContextosActivos(['reserva_cancha_esperando_nombre']));
             }
-            $this->datosReserva['step'] = 'esperando_confirmacion';
+            // Actualizar el cliente con el nombre proporcionado
+            $this->clienteService->actualizarDatosCliente($this->senderId, ['nombre' => $this->datosReserva['nombre_cliente_temporal']]);
+            $this->datosReserva['cliente_obj'] = $this->clienteService->findClienteByTelefono($this->senderId); // Refrescar obj en caché
         }
 
-        // 6. PEDIR CONFIRMACIÓN FINAL
-        if ($this->datosReserva['step'] === 'esperando_confirmacion') {
+        // 4. CONFIRMACIÓN FINAL (Si todos los datos están listos y aún no se ha pedido confirmación)
+        if (!$this->datosReserva['confirmacion_pendiente']) {
             $this->datosReserva['confirmacion_pendiente'] = true;
-            $cliente = $this->clienteService->findOrCreateByTelefono($this->senderId, [])['cliente'];
-            $nombreMostrar = $cliente->nombre ?? $this->datosReserva['nombre_cliente_temporal'] ?? $this->datosReserva['user_profile_name'] ?? 'tú';
-            if ($cliente && !empty($this->datosReserva['nombre_cliente_temporal']) && $this->datosReserva['nombre_cliente_temporal'] !== $cliente->nombre) {
-                $this->clienteService->actualizarDatosCliente($this->senderId, ['nombre' => $this->datosReserva['nombre_cliente_temporal']]);
-                $cliente->refresh();
-            }
-            $nombreMostrar = $cliente->nombre ?? $this->datosReserva['nombre_cliente_temporal'] ?? 'tú';
-
+            $nombreMostrar = $this->datosReserva['cliente_obj']->nombre ?? 'tú';
             $fechaF = Carbon::parse($this->datosReserva['fecha'])->locale('es')->isoFormat('dddd D [de] MMMM');
             $horaIF = Carbon::parse($this->datosReserva['hora_inicio'])->format('H:i');
-            // Asegurarse de que hora_fin esté calculado ANTES de este punto
-            if (empty($this->datosReserva['hora_fin'])) {
-                try {
-                    $this->calcularIntervaloCompleto();
-                } catch (\Exception $e) { /* Debería haberse manejado antes, pero por si acaso */
-                    Log::error("[{$this->cacheKey}] Error al calcular intervalo justo antes de confirmar: " . $e->getMessage());
-                    $this->datosReserva['step'] = 'esperando_duracion_o_fin'; // Retroceder un paso
-                    return $this->prepararRespuesta("Hubo un problema con los detalles de tiempo. Por favor, indica de nuevo la duración o la hora de finalización.", $this->generarNombresContextosActivos(['reserva_cancha_esperando_duracion_o_fin']));
-                }
-            }
             $horaFF = Carbon::parse($this->datosReserva['hora_fin'])->format('H:i');
-
             $confirmMsg = "Perfecto, {$nombreMostrar}. Resumen de tu solicitud:\n";
             $confirmMsg .= "Cancha para el {$fechaF}\n";
             $confirmMsg .= "Desde las {$horaIF} hasta las {$horaFF}.\n";
-            $confirmMsg .= "¿Confirmas la reserva?";
-            $contextos = $this->generarNombresContextosActivos(['reserva_cancha_esperando_confirmacion']);
-            $payload = [
-                'buttons' => [
-                    ['id' => 'confirmar_reserva_si', 'title' => 'Sí, confirmar'], // Estos IDs deben mapear a acciones
-                    ['id' => 'confirmar_cancelacion_reserva', 'title' => 'Cancelar']  // o texto que activen los intents correctos
-                ]
-            ];
-            return $this->prepararRespuesta($confirmMsg, $contextos, 'interactive_buttons', $payload);
+            $confirmMsg .= "¿Confirmas para proceder al pago?";
+            $payload = ['buttons' => [['id' => 'confirmar_reserva_si', 'title' => 'Sí, proceder al pago'], ['id' => 'cancelar_proceso_reserva', 'title' => 'Cancelar Proceso']]];
+            return $this->prepararRespuesta($confirmMsg, $this->generarNombresContextosActivos(['reserva_cancha_esperando_confirmacion']), 'interactive_buttons', $payload);
         }
 
-        // Fallback si el step es desconocido
-        Log::warning("[{$this->cacheKey}] Estado de flujo no manejado. Step: {$this->datosReserva['step']}. Reiniciando.");
-        $this->clearSessionData(); // true para mantener info de reserva activa si la hubo y el usuario quiere verla.
-        $this->datosReserva['step'] = 'inicio'; // Volver a empezar
-        $contextos = $this->generarNombresContextosActivosParaLimpiar(['reserva_cancha_en_progreso']);
-        return $this->prepararRespuesta("Parece que hubo un problema. Vamos a intentarlo de nuevo desde el principio. ¿Te gustaría hacer una reserva?", $contextos);
+        // Fallback si la lógica llega aquí inesperadamente
+        Log::warning("[{$this->cacheKey}] Estado de flujo no manejado. Datos actuales:", $this->datosReserva);
+        $this->clearSessionData();
+        return $this->prepararRespuesta("Parece que nos perdimos. ¿Empezamos de nuevo?", $this->generarNombresContextosActivosParaLimpiar(['reserva_cancha_en_progreso']));
     }
 
 
     private function calcularIntervaloCompleto(): void
     {
         if (empty($this->datosReserva['fecha']) || empty($this->datosReserva['hora_inicio'])) {
-            throw new \InvalidArgumentException("Falta la fecha o la hora de inicio para calcular el intervalo.");
+            throw new InvalidArgumentException("Falta la fecha o la hora de inicio para calcular el intervalo.");
         }
 
         $horaInicioCarbon = Carbon::parse($this->datosReserva['fecha'] . ' ' . $this->datosReserva['hora_inicio']);
@@ -653,7 +425,7 @@ class ReservaCanchaOrquestadorHandler implements IntentHandlerInterface
 
         // Validar que la hora de inicio también cumpla el intervalo de 30 min (redundante si ya se validó, pero seguro)
         if ($minutosInicio % self::INTERVALO_MINUTOS_RESERVA !== 0) {
-            throw new \InvalidArgumentException("La hora de inicio debe ser en intervalos de " . self::INTERVALO_MINUTOS_RESERVA . " minutos.");
+            throw new InvalidArgumentException("La hora de inicio debe ser en intervalos de " . self::INTERVALO_MINUTOS_RESERVA . " minutos.");
         }
 
         $duracionEnMinutosCalculada = 0;
@@ -669,14 +441,14 @@ class ReservaCanchaOrquestadorHandler implements IntentHandlerInterface
                 elseif (in_array($unit, ['min', 'minute', 'minutes']))
                     $duracionEnMinutosCalculada = $amount;
                 else
-                    throw new \InvalidArgumentException("Unidad de duración no entendida: {$duracionData['unit']}.");
+                    throw new InvalidArgumentException("Unidad de duración no entendida: {$duracionData['unit']}.");
             } elseif (is_string($duracionData)) {
                 if (preg_match('/(\d+)\s*(hora|h|horas)/i', $duracionData, $matches))
                     $duracionEnMinutosCalculada = (int) $matches[1] * 60;
                 elseif (preg_match('/(\d+)\s*(minuto|min|minutos)/i', $duracionData, $matches))
                     $duracionEnMinutosCalculada = (int) $matches[1];
                 else
-                    throw new \InvalidArgumentException("No entendí la duración: '{$duracionData}'. Usa '1 hora', '90 minutos', '2 horas y media'.");
+                    throw new InvalidArgumentException("No entendí la duración: '{$duracionData}'. Usa '1 hora', '90 minutos', '2 horas y media'.");
                 // Considerar parseo de "X horas y Y minutos"
                 if (preg_match('/(\d+)\s*(?:hora|h|horas)\s*y\s*(\d+)\s*(?:minuto|min|minutos)/i', $duracionData, $matches)) {
                     $duracionEnMinutosCalculada = (int) $matches[1] * 60 + (int) $matches[2];
@@ -687,22 +459,22 @@ class ReservaCanchaOrquestadorHandler implements IntentHandlerInterface
                 } elseif (preg_match('/(\d+\.?\d*)\s*(?:hora|h|horas)/i', $duracionData, $matches)) { // Para decimales como 1.5 horas
                     $duracionEnMinutosCalculada = (int) ((float) $matches[1] * 60);
                 } else {
-                    throw new \InvalidArgumentException("No entendí la duración: '{$duracionData}'. Usa '1 hora', '90 minutos', '1 hora y 30 minutos'.");
+                    throw new InvalidArgumentException("No entendí la duración: '{$duracionData}'. Usa '1 hora', '90 minutos', '1 hora y 30 minutos'.");
                 }
             } else {
-                throw new \InvalidArgumentException("Formato de duración no reconocido.");
+                throw new InvalidArgumentException("Formato de duración no reconocido.");
             }
 
             // Validar duración mínima y máxima
             if ($duracionEnMinutosCalculada < self::MIN_DURACION_RESERVA_MINUTOS) {
-                throw new \InvalidArgumentException("La duración mínima de la reserva es de " . self::MIN_DURACION_RESERVA_MINUTOS . " minutos (1 hora).");
+                throw new InvalidArgumentException("La duración mínima de la reserva es de " . self::MIN_DURACION_RESERVA_MINUTOS . " minutos (1 hora).");
             }
             if ($duracionEnMinutosCalculada > self::MAX_DURACION_RESERVA_MINUTOS) {
-                throw new \InvalidArgumentException("La duración máxima de la reserva es de " . self::MAX_DURACION_RESERVA_MINUTOS . " minutos (3 horas).");
+                throw new InvalidArgumentException("La duración máxima de la reserva es de " . self::MAX_DURACION_RESERVA_MINUTOS . " minutos (3 horas).");
             }
             // Validar que la duración sea múltiplo del intervalo
             if ($duracionEnMinutosCalculada % self::INTERVALO_MINUTOS_RESERVA !== 0) {
-                throw new \InvalidArgumentException("La duración de la reserva debe ser en múltiplos de " . self::INTERVALO_MINUTOS_RESERVA . " minutos.");
+                throw new InvalidArgumentException("La duración de la reserva debe ser en múltiplos de " . self::INTERVALO_MINUTOS_RESERVA . " minutos.");
             }
 
             $horaFinCalculada = $horaInicioCarbon->copy()->addMinutes($duracionEnMinutosCalculada);
@@ -715,23 +487,23 @@ class ReservaCanchaOrquestadorHandler implements IntentHandlerInterface
             $minutosFin = (int) $horaFinCarbon->format('i');
 
             if ($minutosFin % self::INTERVALO_MINUTOS_RESERVA !== 0) {
-                throw new \InvalidArgumentException("La hora de finalización debe ser en intervalos de " . self::INTERVALO_MINUTOS_RESERVA . " minutos.");
+                throw new InvalidArgumentException("La hora de finalización debe ser en intervalos de " . self::INTERVALO_MINUTOS_RESERVA . " minutos.");
             }
             if ($horaFinCarbon->lte($horaInicioCarbon)) {
-                throw new \InvalidArgumentException("La hora de finalización debe ser posterior a la hora de inicio.");
+                throw new InvalidArgumentException("La hora de finalización debe ser posterior a la hora de inicio.");
             }
 
             $duracionEnMinutosCalculada = $horaInicioCarbon->diffInMinutes($horaFinCarbon);
 
             if ($duracionEnMinutosCalculada < self::MIN_DURACION_RESERVA_MINUTOS) {
-                throw new \InvalidArgumentException("La duración mínima de la reserva es de " . self::MIN_DURACION_RESERVA_MINUTOS . " minutos (1 hora).");
+                throw new InvalidArgumentException("La duración mínima de la reserva es de " . self::MIN_DURACION_RESERVA_MINUTOS . " minutos (1 hora).");
             }
             if ($duracionEnMinutosCalculada > self::MAX_DURACION_RESERVA_MINUTOS) {
-                throw new \InvalidArgumentException("La duración máxima de la reserva es de " . self::MAX_DURACION_RESERVA_MINUTOS . " minutos (3 horas).");
+                throw new InvalidArgumentException("La duración máxima de la reserva es de " . self::MAX_DURACION_RESERVA_MINUTOS . " minutos (3 horas).");
             }
             // Validar que la duración (calculada de hora_fin) sea múltiplo del intervalo
             if ($duracionEnMinutosCalculada % self::INTERVALO_MINUTOS_RESERVA !== 0) {
-                throw new \InvalidArgumentException("El intervalo de tiempo de la reserva debe ser en múltiplos de " . self::INTERVALO_MINUTOS_RESERVA . " minutos.");
+                throw new InvalidArgumentException("El intervalo de tiempo de la reserva debe ser en múltiplos de " . self::INTERVALO_MINUTOS_RESERVA . " minutos.");
             }
 
             // $this->datosReserva['duracion'] = $duracionEnMinutosCalculada; // O mantener como string
@@ -744,26 +516,31 @@ class ReservaCanchaOrquestadorHandler implements IntentHandlerInterface
         $horaCierreOperacion = Carbon::parse($this->datosReserva['fecha'] . ' ' . sprintf('%02d:00:00', self::HORA_FIN_OPERACION));
 
         if ($horaFinFinal->gt($horaCierreOperacion)) {
-            throw new \InvalidArgumentException("La reserva no puede terminar después de las " . sprintf('%02d:00', self::HORA_FIN_OPERACION) . ".");
+            throw new InvalidArgumentException("La reserva no puede terminar después de las " . sprintf('%02d:00', self::HORA_FIN_OPERACION) . ".");
         }
 
         // Validar que la hora_fin no sea igual o anterior a hora_inicio (ya cubierto arriba pero por si acaso)
         if ($horaFinFinal->lte($horaInicioCarbon)) {
-            throw new \InvalidArgumentException("El intervalo de la reserva no es válido (fin <= inicio).");
+            throw new InvalidArgumentException("El intervalo de la reserva no es válido (fin <= inicio).");
         }
     }
 
-    private function intentarCrearReserva(): array
+    private function iniciarFlujoDePago(): array
     {
         $this->datosReserva['confirmacion_pendiente'] = false;
-        $nombreParaCliente = $this->datosReserva['nombre_cliente_temporal'] ?? $this->datosReserva['user_profile_name'] ?? null;
-        $cliente = $this->clienteService->findOrCreateByTelefono($this->senderId, ['nombre' => $nombreParaCliente])['cliente'];
 
-        if (!$cliente) {
-            $this->clearSessionData();
-            $this->datosReserva['step'] = 'finalizado_o_cancelado';
-            return $this->prepararRespuesta("Error: No se pudo obtener la información del cliente.", [], 'text');
+        // --- INICIO DE LA CORRECCIÓN ---
+        // Usar el cliente_id y cliente_obj guardados en la caché de sesión
+        $clienteId = $this->datosReserva['cliente_id']; //
+        $cliente = $this->datosReserva['cliente_obj']; //
+
+        if (!$clienteId || !$cliente) {
+            Log::error("[{$this->cacheKey}] Se intentó iniciar el pago pero no se encontró cliente_id o cliente_obj en caché.");
+            $this->clearSessionData(); //
+            return $this->prepararRespuesta("Hubo un error al recuperar tus datos de cliente. Por favor, intenta el proceso de reserva de nuevo.", $this->generarNombresContextosActivosParaLimpiar(['reserva_cancha_en_progreso'])); //
         }
+        // --- FIN DE LA CORRECCIÓN ---
+
         // Asegurar que el nombre esté actualizado si se proporcionó explícitamente
         if (!empty($this->datosReserva['nombre_cliente_temporal']) && $this->datosReserva['nombre_cliente_temporal'] !== $cliente->nombre) {
             $this->clienteService->actualizarDatosCliente($this->senderId, ['nombre' => $this->datosReserva['nombre_cliente_temporal']]);
@@ -782,49 +559,90 @@ class ReservaCanchaOrquestadorHandler implements IntentHandlerInterface
             return $this->prepararRespuesta("Hubo un problema al procesar la duración/hora de fin: " . $e->getMessage() . ". Por favor, indícalo de nuevo.", $contextos);
         }
 
-        $resultadoReserva = $this->reservaService->crearReservaEnPrimeraCanchaLibre(
-            $cliente->cliente_id,
+        $duracionParaServicio = null; // Asegurar que es null si no se calcula correctamente
+        if (!empty($this->datosReserva['duracion'])) {
+            // tu lógica para parsear this->datosReserva['duracion'] a $duracionParaServicio (array o null)
+            if (is_string($this->datosReserva['duracion'])) {
+                if (preg_match('/(\d+)\s*(hora|h)/i', $this->datosReserva['duracion'], $matches)) {
+                    $duracionParaServicio = ['amount' => (int) $matches[1], 'unit' => 'hour'];
+                } elseif (preg_match('/(\d+)\s*(min)/i', $this->datosReserva['duracion'], $matches)) {
+                    $duracionParaServicio = ['amount' => (int) $matches[1], 'unit' => 'min'];
+                }
+            } elseif (is_array($this->datosReserva['duracion'])) {
+                $duracionParaServicio = $this->datosReserva['duracion'];
+            }
+        }
+
+        $resultadoCreacion = $this->reservaService->crearReservaEnPrimeraCanchaLibre(
+            $this->datosReserva['cliente_id'], // Asumiendo que guardaste el id del cliente
             $this->datosReserva['fecha'],
             $this->datosReserva['hora_inicio'],
-            $this->datosReserva['duracion'], // Pasar el dato de duración (string u objeto)
-            $this->datosReserva['hora_fin'],   // Pasar la hora_fin calculada
-            $cliente
+            $duracionParaServicio, // CORREGIDO: ahora es ?array
+            $this->datosReserva['hora_fin'],
+            $this->datosReserva['cliente_obj'] // Asumiendo que guardaste el objeto cliente
         );
 
-        if ($resultadoReserva['success']) {
-            $this->clearSessionData();
-            $this->datosReserva['step'] = 'finalizado_o_cancelado';
-            $contextosLimpios = $this->generarNombresContextosActivosParaLimpiar(['reserva_cancha_en_progreso', 'reserva_cancha_esperando_confirmacion']);
-            return $this->prepararRespuesta($resultadoReserva['message'], $contextosLimpios, 'text');
+        if ($resultadoCreacion['success'] && isset($resultadoCreacion['reserva'])) {
+            $reservaPendiente = $resultadoCreacion['reserva'];
+            $this->datosReserva['reserva_id_pendiente'] = $reservaPendiente->reserva_id;
+            $this->datosReserva['monto_reserva_pendiente'] = $reservaPendiente->monto_total;
+            $this->datosReserva['step'] = 'esperando_comprobante_reserva';
+
+            $mensajes = [];
+            $urlQrEstatico = URL::asset('image/qr_pago_club.png'); // Debes tener esta imagen en public/images/
+            $captionQr = "¡Tu solicitud está registrada!\nRealiza el pago de *Bs. " . number_format((float) $reservaPendiente->monto_total, 2) . "* escaneando este QR.";
+
+            $mensajes[] = ['fulfillmentText' => $captionQr, 'message_type' => 'image', 'payload' => ['image_url' => $urlQrEstatico, 'caption' => $captionQr]];
+            $instrucciones = "Puedes pagar también a la cuenta XXXX-XXXX-XXXX.\nUna vez realizado el pago, por favor *envíame la foto o captura de pantalla de tu comprobante* para confirmar tu reserva.";
+            $mensajes[] = ['fulfillmentText' => $instrucciones, 'message_type' => 'text'];
+
+            return $this->prepararRespuestaConMultiplesMensajes($mensajes, $this->generarNombresContextosActivos(['reserva_esperando_comprobante']));
         } else {
-            $mensajeError = $resultadoReserva['message'];
-            $contextosReintento = [];
-            if (str_contains($mensajeError, 'no hay canchas disponibles') || str_contains($mensajeError, 'conflicto')) {
-                $this->datosReserva['step'] = 'esperando_hora_inicio';
-                $this->datosReserva['hora_inicio'] = null;
-                $this->datosReserva['hora_fin'] = null;
-                $this->datosReserva['duracion'] = null;
-                $contextosReintento = $this->generarNombresContextosActivos(['reserva_cancha_esperando_hora_inicio']);
-                $mensajeError .= "\n¿Te gustaría intentar con otra hora para el " . Carbon::parse($this->datosReserva['fecha'])->locale('es')->isoFormat('D [de] MMMM') . ", o cambiar la fecha?";
-            } elseif (str_contains($mensajeError, 'fechas pasadas') || str_contains($mensajeError, 'horas pasadas')) {
-                $this->datosReserva['fecha'] = null;
-                $this->datosReserva['hora_inicio'] = null;
-                $this->datosReserva['hora_fin'] = null;
-                $this->datosReserva['duracion'] = null;
-                $this->datosReserva['step'] = 'esperando_fecha';
-                $contextosReintento = $this->generarNombresContextosActivos(['reserva_cancha_esperando_fecha']);
-                $mensajeError .= " Por favor, indícame una nueva fecha.";
-            } else {
-                // Para otros errores, limpiar todo y ofrecer empezar de nuevo o contactar.
-                $this->clearSessionData();
-                $this->datosReserva['step'] = 'finalizado_o_cancelado';
-                $contextosReintento = $this->generarNombresContextosActivosParaLimpiar(['reserva_cancha_en_progreso']);
-                $mensajeError .= " Hubo un problema con tu solicitud. Por favor, intenta de nuevo o contacta a recepción.";
-            }
-            return $this->prepararRespuesta($mensajeError, $contextosReintento, 'text');
+            $this->clearSessionData();
+            return $this->prepararRespuesta($resultadoCreacion['message'] ?? "No se pudo registrar tu solicitud de reserva.", $this->generarNombresContextosActivosParaLimpiar(['reserva_cancha_en_progreso']));
         }
     }
+    // NUEVO MÉTODO PARA MANEJAR EL COMPROBANTE
+    private function manejarComprobante(array $currentDialogflowParams): array
+    {
+        $mediaId = $currentDialogflowParams['media_id'] ?? null;
+        $mimeType = $currentDialogflowParams['mime_type'] ?? null;
+        if (!$mediaId || !Str::startsWith($mimeType, 'image/')) {
+            return $this->prepararRespuesta("Parece que no enviaste una imagen. Por favor, envía la foto de tu comprobante de pago.", $this->generarNombresContextosActivos(['reserva_esperando_comprobante']));
+        }
 
+        $reservaIdPendiente = $this->datosReserva['reserva_id_pendiente'];
+        if (!$reservaIdPendiente) {
+            Log::error("[{$this->cacheKey}] Se recibió comprobante pero no hay reserva_id_pendiente en caché.");
+            $this->clearSessionData();
+            return $this->prepararRespuesta("Hubo un problema asociando tu comprobante. Por favor, contacta a administración.", $this->generarNombresContextosActivosParaLimpiar(['reserva_cancha_en_progreso']));
+        }
+
+        // --- INICIO DE LA LÓGICA DE DESCARGA REAL ---
+        // Obtener una instancia del whatsappController para usar su método de descarga
+        $whatsappDownloader = app(whatsappController::class);
+        $rutaGuardada = $whatsappDownloader->descargarImagenWhatsapp($mediaId, "reserva");
+        // --- FIN DE LA LÓGICA DE DESCARGA REAL ---
+
+        if ($rutaGuardada) {
+            $actualizado = $this->reservaService->asociarComprobanteAReserva($reservaIdPendiente, $rutaGuardada);
+            if ($actualizado) {
+                $mensajeAgradecimiento = "¡Gracias! Hemos recibido tu comprobante para la reserva de Bs. " . number_format((float) $this->datosReserva['monto_reserva_pendiente'], 2) . ".\nUn encargado lo verificará a la brevedad. Tu reserva está *pendiente de confirmación*.";
+            } else {
+                $mensajeAgradecimiento = "Recibí tu comprobante, pero hubo un error al guardarlo en tu registro de reserva. Por favor, contacta a administración mencionando tu reserva.";
+            }
+        } else {
+            // Si la descarga falló
+            $mensajeAgradecimiento = "Tuve problemas para descargar tu comprobante. Por favor, intenta enviarlo de nuevo o contacta a administración.";
+            // Mantenemos al usuario en el mismo paso para que pueda reintentar
+            $this->saveSessionData(); // Guardar el estado actual
+            return $this->prepararRespuesta($mensajeAgradecimiento, $this->generarNombresContextosActivos(['reserva_esperando_comprobante']));
+        }
+
+        $this->clearSessionData();
+        $this->datosReserva['step'] = 'finalizado_o_cancelado';
+        return $this->prepararRespuesta($mensajeAgradecimiento, $this->generarNombresContextosActivosParaLimpiar(['reserva_cancha_en_progreso', 'reserva_esperando_comprobante']));
+    }
     /**
      * Prepara la respuesta para el WhatsappController.
      * Incluye 'outputContextsToSetActive' para que el controller los guarde en caché
@@ -843,35 +661,41 @@ class ReservaCanchaOrquestadorHandler implements IntentHandlerInterface
             'outputContextsToSetActive' => $outputContextsToSetActive
         ];
     }
+    private function prepararRespuestaConMultiplesMensajes(array $mensajesArray, array $outputContextsToSetActive = []): array
+    {
+        return [
+            'messages_to_send' => $mensajesArray,
+            'outputContextsToSetActive' => $outputContextsToSetActive
+        ];
+    }
 
+    private function prepararRespuestaUnSoloMensaje(string $fulfillmentText, array $outputContextsToSetActive = [], string $message_type = 'text', array $payload = []): array
+    {
+        return $this->prepararRespuestaConMultiplesMensajes(
+            [['fulfillmentText' => $fulfillmentText, 'message_type' => $message_type, 'payload' => $payload]],
+            $outputContextsToSetActive
+        );
+    }
     /**
      * Genera la estructura de contextos para guardar en caché y enviar a Dialogflow.
      */
     private function generarNombresContextosActivos(array $specificContextNames): array
     {
-        $projectId = trim(config('dialogflow.project_id'), '/'); // CRÍTICO: quitar barras
-        // $this->senderId ya debe estar normalizado (sin 'whatsapp:')
-        $sessionId = 'whatsapp-' . $this->senderId; // CONSISTENTE con lo que usa whatsappController para llamar a DF
-
-        $contextsParaActivar = [];
-        // Contexto general del flujo
-        if ($this->datosReserva['step'] !== 'inicio' && $this->datosReserva['step'] !== 'finalizado_o_cancelado') {
-            $contextsParaActivar[] = [
-                'name' => "projects/{$projectId}/agent/sessions/{$sessionId}/contexts/reserva_cancha_en_progreso",
-                'lifespanCount' => 10, // Vida útil más larga para el contexto general
-            ];
+        $projectId = trim(config('dialogflow.project_id'), '/');
+        if (empty($projectId)) {
+            Log::error("Project ID está vacío en generarNombresContextos");
+            return [];
         }
-
+        $sessionId = 'whatsapp-' . $this->senderId;
+        $contexts = [];
+        if (!in_array($this->datosReserva['step'], ['inicio', 'finalizado_o_cancelado'])) {
+            $contexts[] = ['name' => "projects/{$projectId}/agent/sessions/{$sessionId}/contexts/reserva_cancha_en_progreso", 'lifespanCount' => 10];
+        }
         foreach ($specificContextNames as $name) {
-            $cleanName = trim($name, '/'); // Nombre del contexto específico
-            $contextsParaActivar[] = [
-                'name' => "projects/{$projectId}/agent/sessions/{$sessionId}/contexts/{$cleanName}",
-                'lifespanCount' => 2, // Vida útil corta para contextos de paso
-            ];
+            $contexts[] = ['name' => "projects/{$projectId}/agent/sessions/{$sessionId}/contexts/" . trim($name, '/'), 'lifespanCount' => 2];
         }
-        return $contextsParaActivar;
+        return $contexts;
     }
-
     private function generarNombresContextosActivosParaLimpiar(array $contextNamesToClear): array
     {
         $projectId = trim(config('dialogflow.project_id'), '/');
