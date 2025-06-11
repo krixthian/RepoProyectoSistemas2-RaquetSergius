@@ -48,7 +48,7 @@
 
         <div class="mb-3">
             <label for="telefono">Teléfono</label>
-            <input type="text" name="telefono" id="telefono" class="form-control" value="{{ old('telefono') }}">
+            <input type="text" name="telefono" max="99999999" id="telefono" class="form-control" value="{{ old('telefono') }}">
         </div>
 
         <div class="mb-3">

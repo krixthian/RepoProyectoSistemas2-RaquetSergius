@@ -23,7 +23,7 @@
         }
         .navbar {
             background-color: #343a40 !important; /* Navbar oscura */
-            border-bottom: 3px solid #59FFD8; /* Acento de tu diseño original */
+            border-bottom: 3px solid #00aaff; /* Acento de tu diseño original */
         }
         .navbar .navbar-brand,
         .navbar .nav-link {
