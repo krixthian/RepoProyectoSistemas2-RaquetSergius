@@ -21,6 +21,8 @@ use App\Http\Controllers\ClienteController;
 
 use App\Http\Controllers\Admin\ChurnController;
 
+use App\Http\Controllers\reservasControllers\ReservaControllerComp;
+
 Route::get('/login', function () {
     if (auth()->check()) {
         return redirect()->intended(route('admin.empleados.index'));
@@ -28,12 +30,46 @@ Route::get('/login', function () {
     return view('login');
 })->name('login');
 
+
+// --- RUTAS PROTEGIDAS  ---
+Route::middleware(['auth'])->group(function () {
+
+
+    Route::get('/', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
+    Route::get('/admin/empleados', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
+
+    Route::get('/reservas/opciones', [ReservaControllerComp::class, 'opciones'])->name('admin.reservas.opciones');
+    Route::get('/reservas/opciones/pendientes', [ReservaControllerComp::class, 'index'])->name('admin.reservas.pendientes');
+    Route::get('/reservas/opciones/pendientes/{id_reserva}', [ReservaControllerComp::class, 'verReserva'])->name('admin.reservas.ver');
+
+    //RESERVAS
+    Route::resource('reservas', ReservaController::class);
+
+
+
+    Route::get('/admin/panel', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
+
+
+
+    Route::resource('reservas', ReservaController::class);
+
+    Route::post('/logout', function (Request $request) {
+        auth()->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+        return redirect('/login');
+    })->name('logout');
+
+});
+// ------------------------------------
+
 Route::post('/login', function (Request $request) {
     Log::info('Attempting login for user: ' . $request->usuario);
     $request->validate([
         'usuario' => 'required',
         'password' => 'required'
     ]);
+
 
     $empleado = Empleado::where('usuario', $request->usuario)->first();
 
@@ -72,29 +108,6 @@ Route::resource('equipos', EquipoController::class);
 Route::get('/admin/churn-analisis', [ChurnController::class, 'index'])->name('admin.churn.index');
 
 Route::resource('clientes', ClienteController::class);
-// ------------------------------------
-
-// --- RUTAS PROTEGIDAS  ---
-Route::middleware(['auth'])->group(function () {
-
-    Route::get('/', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
-    Route::get('/admin/empleados', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
-    Route::resource('reservas', ReservaController::class);
-
-
-    Route::get('/admin/panel', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
-
-
-    Route::resource('reservas', ReservaController::class);
-
-    Route::post('/logout', function (Request $request) {
-        auth()->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-        return redirect('/login');
-    })->name('logout');
-
-});
 // ------------------------------------
 
 

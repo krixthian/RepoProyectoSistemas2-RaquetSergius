@@ -24,6 +24,8 @@ class Reserva extends Model
         'hora_fin',       // Columna para la hora de fin (ej: 15:00:00)
         'monto',
         'estado',
+        'monto_total',
+        'ruta_comprobante_pago',
         'metodo_pago',
         'pago_completo',
     ];
@@ -35,6 +37,8 @@ class Reserva extends Model
         'fecha' => 'date:Y-m-d',
         'monto' => 'decimal:2',
         'pago_completo' => 'boolean',
+        'monto_total' => 'decimal:2',
+        'ruta_comprobante_pago' => 'string',
     ];
 
     /**

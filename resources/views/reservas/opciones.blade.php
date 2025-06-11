@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 
-@section('title', 'Panel de Administración') {{-- Título específico de la página --}}
+@section('title', 'Panel de RESERVAS') {{-- Título específico de la página --}}
 
 @push('styles')
     <style>
@@ -111,9 +111,9 @@
 
         <div class="management-options">
 
-            <a href="{{ route('admin.reservas.opciones') }}" class="option-card">
-                <h2>Gestión de Reservas</h2>
-                <p>Administra las reservas de canchas y otros servicios.</p>
+            <a href="{{ route('reservas.index') }}" class="option-card">
+                <h2>Administrar Reservas</h2>
+                <p>Administra las reservas y sus datos.</p>
                 <span class="status status-implemented">Implementado</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Gestionar</span>
@@ -123,10 +123,10 @@
 
 
 
-            <a href="/empleados" class="option-card">
-                <h2>Gestión de Empleados</h2>
-                <p>Administra los usuarios empleados del sistema (roles, accesos, etc.).</p>
-                <span class="status status-implemented">Implementado</span>
+            <a href="{{ route('admin.reservas.pendientes') }}" class="option-card">
+                <h2>Comprobantes de pago</h2>
+                <p>Administra los pagos Confirmar y Rechazar</p>
+                <span class="status status-implemented">Pendiente</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Ver Lista</span>
                 </div>
@@ -134,8 +134,8 @@
 
 
             <a href="{{ route('clientes.index') }}" class="option-card">
-                <h2>Gestión de Clientes</h2>
-                <p>Visualiza y administra la información de los clientes.</p>
+                <h2>sadffdsdsfdfsfdss</h2>
+                <p>asafsddfsadfsdfssdfdsf</p>
                 <span class="status status-implemented">Implementado</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Gestionar</span>
@@ -145,8 +145,8 @@
 
 
             <div class="option-card">
-                <h2>Gestión de Premios</h2>
-                <p>Administrar los premios disponibles para canjear.</p>
+                <h2>OPCION4</h2>
+                <p>safdsdfasdfafdsfdsfsdafds</p>
                 <span class="status status-pending">Pendiente</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage disabled">Gestionar</span>
@@ -154,68 +154,7 @@
             </div>
 
 
-            <div class="option-card">
-                <h2>Gestión de Áreas de Zumba</h2>
-                <p>Administra las áreas para clases de Zumba, capacidades y horarios.</p>
-                <span class="status status-pending">Pendiente</span>
-                <div style="margin-top: 10px;">
-                    <span class="btn-manage disabled">Gestionar</span>
-                </div>
-            </div>
 
-
-            <div class="option-card">
-                <h2>Gestión de Clases de Zumba</h2>
-                <p>Define y administra las clases de Zumba, instructores y cupos.</p>
-                <span class="status status-pending">Pendiente</span>
-                <div style="margin-top: 10px;">
-                    <span class="btn-manage disabled">Gestionar</span>
-                </div>
-            </div>
-
-
-            <div class="option-card">
-                <h2>Gestión de Instructores</h2>
-                <p>Administra la información y especialidades de los instructores.</p>
-                <span class="status status-pending">Pendiente</span>
-                <div style="margin-top: 10px;">
-                    <span class="btn-manage disabled">Gestionar</span>
-                </div>
-            </div>
-
-            <a href="/torneos" class="option-card">
-
-                <h2>Gestión de Eventos y Torneos</h2>
-                <p>Organiza y administra eventos especiales y torneos.</p>
-                <span class="status status-implemented">Implementado</span>
-                <div style="margin-top: 10px;">
-                    <span class="btn-manage">Gestionar</span>
-                </div>
-
-            </a>
-
-            <a href="{{ route('dashboard') }}" class="option-card">
-
-                <h2>Reportes y Estadísticas</h2>
-                <p>Visualiza datos importantes sobre el funcionamiento del sistema.</p>
-                <span class="status status-implemented">Implementado</span>
-                <div style="margin-top: 10px;">
-                    <span class="btn-manage">Ver Dashboard</span>
-                </div>
-
-            </a>
-
-
-            <a href="{{ route('admin.churn.index') }}" class="option-card">
-
-                <h2>Tasa de abandono (Chrun)</h2>
-                <p>Visualiza analisis de Churn</p>
-                <span class="status status-implemented">Implementado</span>
-                <div style="margin-top: 10px;">
-                    <span class="btn-manage">Ver</span>
-                </div>
-
-            </a>
 
 
         </div>

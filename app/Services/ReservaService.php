@@ -67,159 +67,102 @@ class ReservaService
      * @param Cliente $cliente 
      * @return array 
      */
+    /**
+     * Intenta crear una reserva en la primera cancha que encuentre libre.
+     * La crea con estado 'Pendiente' y calcula el monto.
+     * Devuelve el objeto Reserva en caso de éxito.
+     */
     public function crearReservaEnPrimeraCanchaLibre(
         int $clienteId,
-        string $fechaIso,
-        string $horaInicioIso,
-        ?array $duracion,
-        ?string $horaFinIso,
+        string $fecha,
+        string $horaInicio,
+        ?array $duracionArray,
+        ?string $horaFin,
         Cliente $cliente
-    ): array {
-        Log::info("[ReservaService] Iniciando creación de reserva en primera cancha libre.", compact('clienteId', 'fechaIso', 'horaInicioIso', 'duracion', 'horaFinIso'));
+    ): array { //
+        $horaInicioCarbon = Carbon::parse($horaInicio);
+        $horaFinCalculada = $horaFin ? Carbon::parse($horaFin) : null;
 
-        try {
-            $fechaReserva = Carbon::parse($fechaIso)->startOfDay();
-            $horaInicioObj = Carbon::parse($horaInicioIso);
-
-            $fechaHoraInicioReserva = $fechaReserva->copy()->setTimeFrom($horaInicioObj);
-            $horaFinCalculada = null;
-
-            if ($horaFinIso) {
-                $horaFinObj = Carbon::parse($horaFinIso);
-                $horaFinCalculada = $fechaReserva->copy()->setTimeFrom($horaFinObj);
-                if ($horaFinCalculada->lessThanOrEqualTo($fechaHoraInicioReserva)) {
-                    return ['success' => false, 'message' => 'La hora de fin debe ser posterior a la hora de inicio.'];
-                }
-            } elseif ($duracion && isset($duracion['amount']) && isset($duracion['unit'])) {
-                try {
-                    $seconds = 0;
-                    switch ($duracion['unit']) {
-                        case 's':
-                            $seconds = $duracion['amount'];
-                            break;
-                        case 'min':
-                            $seconds = $duracion['amount'] * 60;
-                            break;
-                        case 'h':
-                            $seconds = $duracion['amount'] * 3600;
-                            break;
-                        case 'hora':
-                            $seconds = $duracion['amount'] * 3600;
-                            break;
-                        default:
-                            return ['success' => false, 'message' => 'La unidad de duración no es válida. Por favor, usa horas o minutos.'];
-                    }
-                    if ($seconds <= 0) {
-                        return ['success' => false, 'message' => 'La duración debe ser mayor a cero.'];
-                    }
-                    $horaFinCalculada = $fechaHoraInicioReserva->copy()->addSeconds($seconds);
-                } catch (\Exception $e) {
-                    Log::error("[ReservaService] Error al parsear duración: " . $e->getMessage(), ['duracion' => $duracion]);
-                    return ['success' => false, 'message' => 'No se pudo entender la duración proporcionada.'];
-                }
-            } else {
-                $horaFinCalculada = $fechaHoraInicioReserva->copy()->addHour();
-                Log::info("[ReservaService] Usando duración por defecto de 1 hora.");
+        if (!$horaFinCalculada && is_array($duracionArray)) {
+            $amount = $duracionArray['amount'] ?? 0;
+            $unit = $duracionArray['unit'] ?? 'hour';
+            $horaFinCalculada = $horaInicioCarbon->copy();
+            if ($unit === 'hour' || $unit === 'h') {
+                $horaFinCalculada->addHours($amount);
+            } elseif ($unit === 'min') {
+                $horaFinCalculada->addMinutes($amount);
             }
+        }
 
-            if ($fechaReserva->isPast() && !$fechaReserva->isToday()) {
-                return ['success' => false, 'message' => 'No puedes realizar reservas para fechas pasadas.'];
+        if (!$horaFinCalculada) {
+            return ['success' => false, 'message' => 'No se pudo determinar la hora de finalización de la reserva.'];
+        }
+
+        $canchasDisponibles = Cancha::where('disponible', true)->get();
+        $canchaEncontrada = null;
+
+        foreach ($canchasDisponibles as $cancha) {
+            $conflicto = Reserva::where('cancha_id', $cancha->cancha_id)
+                ->where('fecha', $fecha)
+                ->whereIn('estado', ['Confirmada', 'Pendiente']) // Una reserva pendiente también ocupa el espacio
+                ->where(function ($query) use ($horaInicio, $horaFinCalculada) {
+                    $query->where(function ($q) use ($horaInicio, $horaFinCalculada) {
+                        $q->where('hora_inicio', '<', $horaFinCalculada->format('H:i:s'))
+                            ->where('hora_fin', '>', $horaInicio);
+                    });
+                })->exists();
+
+            if (!$conflicto) {
+                $canchaEncontrada = $cancha;
+                break;
             }
-            if ($fechaReserva->isToday() && $fechaHoraInicioReserva->isPast()) {
-                return ['success' => false, 'message' => 'No puedes realizar reservas para horas pasadas hoy.'];
-            }
+        }
 
-            $horaMinima = 8;
-            $horaMaximaSistema = 22;
-            if ($fechaHoraInicioReserva->hour < $horaMinima || $horaFinCalculada->hour > $horaMaximaSistema || ($horaFinCalculada->hour == $horaMaximaSistema && $horaFinCalculada->minute > 0)) {
-                return ['success' => false, 'message' => "Solo puedes reservar canchas entre las {$horaMinima}:00 y las {$horaMaximaSistema}:00.\n Si tienes problemas usa el formato de 24 horas ej. '14:00'"];
-            }
+        if (!$canchaEncontrada) {
+            return ['success' => false, 'message' => "Lo sentimos, no hay canchas disponibles en el horario de {$horaInicio} a " . $horaFinCalculada->format('H:i') . "."];
+        }
 
-            $canchasActivas = Cancha::where('disponible', true)
-                ->orderBy('cancha_id')
-                ->get();
+        // --- Lógica de cálculo de precio (ajusta según tus reglas) ---
+        $duracionEnHoras = $horaInicioCarbon->diffInMinutes($horaFinCalculada) / 60;
+        $precioPorHora = $canchaEncontrada->precio_hora ?? 50; // Precio por defecto si no está definido
+        $precioTotal = $duracionEnHoras * $precioPorHora;
 
-            if ($canchasActivas->isEmpty()) {
-                return ['success' => false, 'message' => 'No hay canchas configuradas o habilitadas en el sistema.'];
-            }
+        if ($canchaEncontrada) {
+            try {
+                DB::beginTransaction();
+                $nuevaReserva = Reserva::create([
+                    'cliente_id' => $clienteId,
+                    'cancha_id' => $canchaEncontrada->cancha_id,
+                    'fecha' => $fecha,
+                    'hora_inicio' => $horaInicio,
+                    'hora_fin' => $horaFinCalculada->format('H:i:s'),
+                    'estado' => 'Pendiente', // Estado inicial
+                    'monto_total' => $precioTotal,
+                    'monto' => $precioTotal, // Monto inicial
+                    'metodo_pago' => 'QR',
+                    'pago_completo' => false, // Inicialmente no pagado
 
-            $canchaAsignada = null;
-            $montoReserva = 0;
+                ]);
 
-            foreach ($canchasActivas as $cancha) {
-                $reservaExistente = Reserva::where('cancha_id', $cancha->cancha_id)
-                    ->where('fecha', $fechaReserva->toDateString())
-                    ->where(function ($query) use ($fechaHoraInicioReserva, $horaFinCalculada) {
-                        $query->where(function ($q) use ($fechaHoraInicioReserva, $horaFinCalculada) {
-                            $q->where('hora_inicio', '<', $horaFinCalculada->toTimeString())
-                                ->where('hora_fin', '>', $fechaHoraInicioReserva->toTimeString());
-                        });
-                    })
-                    ->where('estado', '!=', 'Cancelada')
-                    ->exists();
-
-                if (!$reservaExistente) {
-                    $canchaAsignada = $cancha;
-                    $montoReserva = $canchaAsignada->precio_hora * ($fechaHoraInicioReserva->diffInMinutes($horaFinCalculada) / 60); // Cálculo del monto por duración
-                    break;
-                }
-            }
-
-            if (!$canchaAsignada) {
-                Log::info("[ReservaService] No se encontraron canchas disponibles.", ['fecha' => $fechaReserva->toDateString(), 'inicio' => $fechaHoraInicioReserva->toTimeString(), 'fin' => $horaFinCalculada->toTimeString()]);
-                return ['success' => false, 'message' => "Lo sentimos, no hay canchas disponibles para el {$fechaReserva->isoFormat('dddd D [de] MMMM')} de {$fechaHoraInicioReserva->format('H:i')} a {$horaFinCalculada->format('H:i')}."];
-            }
-
-            Log::info("[ReservaService] Cancha asignada: ID {$canchaAsignada->cancha_id} ({$canchaAsignada->nombre_cancha})");
-
-            DB::beginTransaction();
-            $nuevaReserva = Reserva::create([
-                'cliente_id' => $clienteId,
-                'cancha_id' => $canchaAsignada->cancha_id,
-                'fecha' => $fechaReserva->toDateString(),
-                'hora_inicio' => $fechaHoraInicioReserva->toTimeString(),
-                'hora_fin' => $horaFinCalculada->toTimeString(),
-                'monto' => $montoReserva,
-                'pago_completo' => false,
-                'estado' => 'Confirmada',
-                'metodo_pago' => 'Efectivo'
-            ]);
-
-            //Actualizacion last_activity_at del cliente (CHURN)
-            if ($cliente) {
                 $cliente->last_activity_at = Carbon::now();
-                $cliente->is_churned = false; // Una nueva actividad significa que ya no está en churn
                 $cliente->save();
-                Log::info("[ReservaService] Actualizado last_activity_at para cliente ID {$cliente->cliente_id} por reserva.");
-            } else {
-                Log::warning("[ReservaService] No se pudo actualizar last_activity_at: objeto cliente no proporcionado.");
+
+                DB::commit();
+                Log::info("Reserva PENDIENTE creada (ID: {$nuevaReserva->reserva_id}) para cliente {$clienteId}");
+                return [
+                    'success' => true,
+                    'message' => "Tu solicitud de reserva ha sido registrada.",
+                    'reserva' => $nuevaReserva // <-- Esencial devolver esto
+                ];
+            } catch (\Exception $e) {
+                DB::rollBack();
+                Log::error("Error de SQL al crear reserva PENDIENTE: " . $e->getMessage());
+                return ['success' => false, 'message' => 'Hubo un error al registrar tu solicitud.'];
             }
-
-
-            DB::commit();
-            Log::info("[ReservaService] Reserva creada exitosamente.", ['reserva_id' => $nuevaReserva->getKey()]); // Usar getKey() para la PK
-
-
-            return [
-                'success' => true,
-                'message' => "¡Tu reserva de cancha #{$canchaAsignada->cancha_id} de wally  el {$fechaReserva->locale('es')->isoFormat('dddd D [de] MMMM')} de {$fechaHoraInicioReserva->format('H:i')} a {$horaFinCalculada->format('H:i')} ha sido confirmada! El monto es de " . number_format($montoReserva, 2) . " Bs., Te esperamos!",
-                'data' => $nuevaReserva
-            ];
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error("[ReservaService] Error general al crear reserva en primera cancha libre: " . $e->getMessage(), [
-                'clienteId' => $clienteId,
-                'fechaIso' => $fechaIso,
-                'horaInicioIso' => $horaInicioIso,
-                'duracion' => $duracion,
-                'horaFinIso' => $horaFinIso,
-                'trace' => $e->getTraceAsString()
-            ]);
-            return ['success' => false, 'message' => 'Lo siento, ocurrió un error inesperado al procesar tu reserva. Por favor, intenta más tarde.'];
+        } else {
+            return ['success' => false, 'message' => 'Lo sentimos, no hay canchas disponibles en ese horario.'];
         }
     }
-
 
     /**
      *
@@ -327,6 +270,18 @@ class ReservaService
         }
     }
 
+    public function asociarComprobanteAReserva(int $reservaId, string $rutaComprobante): bool
+    {
+        $reserva = Reserva::find($reservaId);
+        if ($reserva && $reserva->estado === 'Pendiente') {
+            $reserva->ruta_comprobante_pago = $rutaComprobante;
+            $reserva->save();
+            Log::info("Comprobante '{$rutaComprobante}' asociado a reserva ID {$reservaId}.");
+            return true;
+        }
+        Log::warning("No se pudo asociar comprobante. Reserva ID {$reservaId} no encontrada o no está en estado 'Pendiente'.");
+        return false;
+    }
     public function findReservaById(int $reservaId): ?Reserva
     {
         try {
