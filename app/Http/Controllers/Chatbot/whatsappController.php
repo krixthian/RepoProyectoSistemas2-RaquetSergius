@@ -662,7 +662,7 @@ class whatsappController extends Controller
      * @param string $message
      * @return bool
      */
-    private function sendWhatsAppMessage(string $recipient, string $message): bool
+    public function sendWhatsAppMessage(string $recipient, string $message): bool
     {
         if (empty($this->wsToken) || empty($this->whatsappBusinessId)) {
             Log::error('WhatsApp credentials (token or business ID) not configured.');

@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 
-@section('title', 'Panel de RESERVAS') {{-- Título específico de la página --}}
+@section('title', 'Panel de opciones zumba') {{-- Título específico de la página --}}
 
 @push('styles')
     <style>
@@ -67,8 +67,7 @@
 @section('content')
     <div class="admin-panel-container">
         <div class="welcome-message">
-            <h1 style="color: var(--blueraquet-color);">Bienvenido al Panel de Administración, {{ Auth::user()->nombre }}
-            </h1>
+            <h1 style="color: var(--blueraquet-color);">Panel de Administración de Zumba</h1>
             <p>Selecciona una opción para comenzar a gestionar el sistema.</p>
         </div>
 
@@ -76,8 +75,9 @@
 
             <a href="{{ route('reservas.index') }}" class="option-card">
                 <h2>Administrar Reservas</h2>
+                <br>
                 <p>Administra las reservas y sus datos.</p>
-                <span class="status status-implemented">------------------------------------------</span>
+                <span class="status status-implemented">Implementado</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Gestionar</span>
                 </div>
@@ -86,10 +86,10 @@
 
 
 
-            <a href="{{ route('admin.reservas.pendientes') }}" class="option-card">
-                <h2>Reservas Pendientes</h2>
-                <p>Confirmar y Rechazar Reservas</p>
-                <span class="status status-implemented">------------------------------------------</span>
+            <a href="{{ route('zumba.pendientes') }}" class="option-card">
+                <h2>Inscripciones pendientes</h2>
+                <p>Confirmar y Rechazar pendientes</p>
+                <span class="status status-implemented">Pendiente</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Ver Lista</span>
                 </div>
@@ -98,8 +98,9 @@
 
             <a href="{{ route('clientes.index') }}" class="option-card">
                 <h2>sadffdsdsfdfsfdss</h2>
+                <br>
                 <p>asafsddfsadfsdfssdfdsf</p>
-                <span class="status status-implemented">------------------------------------------</span>
+                <span class="status status-implemented">Implementado</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Gestionar</span>
                 </div>
@@ -109,10 +110,12 @@
 
             <div class="option-card">
                 <h2>OPCION4</h2>
+                <br>
                 <p>safdsdfasdfafdsfdsfsdafds</p>
-                <span class="status status-implemented">------------------------------------------</span>
+
+                <span class="status status-pending">Pendiente</span>
                 <div style="margin-top: 10px;">
-                    <span class="btn-manage">Gestionar</span>
+                    <span class="btn-manage disabled">Gestionar</span>
                 </div>
             </div>
 

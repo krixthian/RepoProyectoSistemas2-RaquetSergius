@@ -1,9 +1,18 @@
+@php
+    // Obtenemos los datos comunes de la primera inscripción del grupo
+    $primera_inscripcion = $inscripciones->first();
+    $cliente = $primera_inscripcion->cliente;
+    $ruta_comprobante = $primera_inscripcion->ruta_comprobante_pago;
+    $comprobanteHash = str_replace('/', '-', $ruta_comprobante);
+@endphp
+
 <!DOCTYPE html>
 <html lang="es">
 
 <head>
     <meta charset="UTF-8">
-    <title>Detalle Reserva #{{ $reserva->reserva_id }}</title>
+    <title>Revisar Pago de Inscripción - Cliente: {{ $cliente->nombre }}</title>
+    {{-- Copia los estilos de tu vista verReserva.blade.php aquí --}}
     <style>
         /* 1. Paleta de Colores y Estilos Base */
         :root {
@@ -199,113 +208,99 @@
 
 <body>
     <div class="container">
-        <h1>Detalle de la Reserva</h1>
+        <h1>Revisión de Pago de Inscripción a Zumba</h1>
 
         <div class="detail-card">
+            <h2>Datos del Cliente</h2>
             <div class="detail-grid">
-                <div class="detail-item"><strong>ID Reserva</strong><span>#{{ $reserva->reserva_id }}</span></div>
-                <div class="detail-item"><strong>Cliente</strong><span>{{ $reserva->cliente->nombre ?? '–' }}
-                        {{ $reserva->cliente->apellido ?? '' }}</span></div>
-                <div class="detail-item"><strong>Cancha</strong><span>{{ $reserva->cancha->nombre ?? '–' }}</span></div>
-                <div class="detail-item">
-                    <strong>Fecha</strong><span>{{ \Carbon\Carbon::parse($reserva->fecha)->format('d/m/Y') }}</span>
-                </div>
-                <div class="detail-item">
-                    <strong>Horario</strong><span>{{ \Carbon\Carbon::parse($reserva->hora_inicio)->format('H:i') }} a
-                        {{ \Carbon\Carbon::parse($reserva->hora_fin)->format('H:i') }}</span>
-                </div>
-                <div class="detail-item"><strong>Monto Total</strong><span>{{ number_format($reserva->monto, 2) }}
-                        Bs.</span></div>
-                <div class="detail-item"><strong>Estado</strong><span>{{ $reserva->estado }}</span></div>
-                <div class="detail-item"><strong>Método
-                        Pago</strong><span>{{ $reserva->metodo_pago ?? 'No especificado' }}</span></div>
+                <div class="detail-item"><strong>Cliente</strong><span>{{ $cliente->nombre ?? '–' }}</span></div>
+                <div class="detail-item"><strong>Teléfono</strong><span>{{ $cliente->telefono ?? '–' }}</span></div>
             </div>
         </div>
 
-        {{-- NUEVA SECCIÓN PARA MOSTRAR EL COMPROBANTE --}}
         <h2>Comprobante de Pago</h2>
         <div class="detail-card comprobante-container">
-            @if ($reserva->ruta_comprobante_pago)
-                <img src="{{ asset('storage/' . $reserva->ruta_comprobante_pago) }}" alt="Comprobante de pago">
+            @if ($ruta_comprobante)
+                <img src="{{ asset('storage/' . $ruta_comprobante) }}" alt="Comprobante de pago">
             @else
-                <p>No se ha subido un comprobante de pago para esta reserva.</p>
+                <p>No se ha subido un comprobante de pago.</p>
             @endif
         </div>
 
-        {{-- FORMULARIO DE ACCIONES (CONFIRMAR/RECHAZAR) --}}
-        @if ($reserva->estado == 'Pendiente')
-            <form id="action-form" method="POST" class="actions-form">
-                @csrf
-                <h2>Acciones de Revisión</h2>
+        <h2>Clases Incluidas en este Pago</h2>
+        <div class="detail-card">
+            <ul>
+                @php $montoTotal = 0; @endphp
+                @foreach ($inscripciones as $inscripcion)
+                    @if ($inscripcion->claseZumba)
+                        <li>
+                            <strong>Clase ID {{ $inscripcion->clase_id }}:</strong>
+                            {{ $inscripcion->claseZumba->diasemama }}
+                            ({{ \Carbon\Carbon::parse($inscripcion->fecha_clase)->format('d/m/Y') }})
+                            a las {{ \Carbon\Carbon::parse($inscripcion->claseZumba->hora_inicio)->format('H:i') }}
+                            - <strong>Bs. {{ number_format($inscripcion->monto_pagado, 2) }}</strong>
+                        </li>
+                        @php $montoTotal += $inscripcion->monto_pagado; @endphp
+                    @endif
+                @endforeach
+            </ul>
+            <hr style="border-color: var(--border-color); margin: 1rem 0;">
+            <p style="text-align: right; font-size: 1.2rem; font-weight: bold;">
+                Monto Total del Comprobante: Bs. {{ number_format($montoTotal, 2) }}
+            </p>
+        </div>
 
-                <div class="form-group">
-                    <label for="mensaje">Mensaje adicional para el cliente (obligatorio)</label>
-                    <textarea name="mensaje" id="mensaje" rows="4"
-                        placeholder="Ej:fue rechazado por que el comprobante no es valido" required minlength="10">{{ old('mensaje') }}</textarea>
-                </div>
-
-                <div class="form-actions">
-                    <a href="{{ route('admin.reservas.pendientes') }}" class="button-link button-secondary">Cancelar
-                        y Volver</a>
-
-                    <div class="action-buttons">
-                        <button type="submit" class="button button-danger" data-action="rechazar"
-                            data-confirm="¿Estás seguro de que deseas RECHAZAR esta reserva?">
-                            Rechazar Reserva
-                        </button>
-                        <button type="submit" class="button button-success" data-action="confirmar"
-                            data-confirm="¿Estás seguro de que deseas CONFIRMAR esta reserva?">
-                            Confirmar Reserva
-                        </button>
-                    </div>
-                </div>
-            </form>
-        @else
-            <div class="form-actions">
-                <a href="{{ route('admin.reservas.pendientes') }}" class="button-link button-secondary">Volver al
-                    listado</a>
+        <form id="action-form" method="POST" class="actions-form">
+            @csrf
+            <h2>Acciones de Revisión</h2>
+            <div class="form-group">
+                <label for="mensaje">Mensaje adicional para el cliente (obligatorio)</label>
+                <textarea name="mensaje" id="mensaje" rows="4" placeholder="Ej: Pago recibido correctamente. ¡Te esperamos!"
+                    required minlength="10">{{ old('mensaje') }}</textarea>
             </div>
-        @endif
+            <div class="form-actions">
+                <a href="{{ route('zumba.pendientes') }}" class="button-link button-secondary">Cancelar y
+                    Volver</a>
+                <div class="action-buttons">
+                    <button type="submit" class="button button-danger" data-action="rechazar">Rechazar
+                        Inscripciones</button>
+                    <button type="submit" class="button button-success" data-action="confirmar">Confirmar
+                        Inscripciones</button>
+                </div>
+            </div>
+        </form>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('action-form');
             if (form) {
-                // URLs para las acciones, obtenidas desde las rutas de Laravel
-                const urlConfirmar = "{{ route('reservas.confirmar', $reserva->reserva_id) }}";
-                const urlRechazar = "{{ route('reservas.rechazar', $reserva->reserva_id) }}";
+                const urlConfirmar =
+                    "{{ route('zumba.pendientes.confirmar', ['cliente_id' => $cliente->cliente_id, 'comprobante_hash' => $comprobanteHash]) }}";
+                const urlRechazar =
+                    "{{ route('zumba.pendientes.rechazar', ['cliente_id' => $cliente->cliente_id, 'comprobante_hash' => $comprobanteHash]) }}";
 
                 form.addEventListener('submit', function(event) {
-                    // Previene el envío inmediato del formulario
                     event.preventDefault();
-
-                    // Obtiene el botón que fue presionado
                     const submitter = event.submitter;
                     const actionType = submitter.dataset.action;
-                    const confirmationMessage = submitter.dataset.confirm;
 
-                    // Valida que el textarea no esté vacío (aunque ya tiene 'required')
-                    const mensajeTextarea = document.getElementById('mensaje');
-                    if (mensajeTextarea.value.trim().length < 10) {
-                        alert('Por favor, escribe un mensaje de al menos 10 caracteres para el cliente.');
-                        mensajeTextarea.focus();
-                        return;
-                    }
-
-                    // Muestra el diálogo de confirmación
-                    if (confirm(confirmationMessage)) {
-                        // Asigna la URL correcta a la acción del formulario
-                        if (actionType === 'confirmar') {
+                    if (actionType === 'confirmar') {
+                        if (confirm('¿Estás seguro de que deseas CONFIRMAR este grupo de inscripciones?')) {
                             form.action = urlConfirmar;
-                        } else if (actionType === 'rechazar') {
-                            form.action = urlRechazar;
+                            form.submit();
                         }
-
-                        // Envía el formulario
-                        form.submit();
+                    } else if (actionType === 'rechazar') {
+                        if (confirm('¿Estás seguro de que deseas RECHAZAR este grupo de inscripciones?')) {
+                            form.action = urlRechazar;
+                            form.submit();
+                        }
                     }
                 });
+
+                // Asignar el data-action a los botones para que el event.submitter funcione
+                form.querySelector('.button-danger').dataset.action = 'rechazar';
+                form.querySelector('.button-success').dataset.action = 'confirmar';
             }
         });
     </script>

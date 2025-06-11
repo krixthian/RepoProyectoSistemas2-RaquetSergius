@@ -27,45 +27,6 @@
             gap: 20px;
         }
 
-        .option-card {
-            background-color: #fff;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-            text-decoration: none;
-            /* Para que toda la tarjeta sea clickeable si se envuelve en <a> */
-            color: inherit;
-            /* Para que el texto dentro de <a> no sea azul por defecto */
-            display: block;
-            /* Para que <a> ocupe todo el espacio de la tarjeta */
-        }
-
-        .option-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        .option-card h2 {
-            font-size: 1.5em;
-            color: #2C3844;
-            /* Tomado de tu style.css */
-            margin-bottom: 10px;
-        }
-
-        .option-card p {
-            font-size: 0.95em;
-            color: #4A5568;
-            margin-bottom: 15px;
-            min-height: 40px;
-            /* Para alinear tarjetas con descripciones de diferente longitud */
-        }
-
-        .option-card .status {
-            font-size: 0.8em;
-            font-weight: bold;
-        }
 
         .status-implemented {
             color: #38A169;
@@ -94,7 +55,7 @@
             background-color: #1a2229;
         }
 
-        .btn-manage.disabled {
+        .btn-manage. {
             background-color: #A0AEC0;
             z color: #E2E8F0;
             cursor: not-allowed;
@@ -105,7 +66,8 @@
 @section('content')
     <div class="admin-panel-container">
         <div class="welcome-message">
-            <h1>Bienvenido al Panel de Administración, {{ Auth::user()->nombre }}</h1>
+            <h1 style="color: var(--blueraquet-color);">Bienvenido al Panel de Administración, {{ Auth::user()->nombre }}
+            </h1>
             <p>Selecciona una opción para comenzar a gestionar el sistema.</p>
         </div>
 
@@ -114,7 +76,7 @@
             <a href="{{ route('admin.reservas.opciones') }}" class="option-card">
                 <h2>Gestión de Reservas</h2>
                 <p>Administra las reservas de canchas y otros servicios.</p>
-                <span class="status status-implemented">Implementado</span>
+                <span class="status status-implemented">------------------------------------------</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Gestionar</span>
                 </div>
@@ -126,7 +88,7 @@
             <a href="/empleados" class="option-card">
                 <h2>Gestión de Empleados</h2>
                 <p>Administra los usuarios empleados del sistema (roles, accesos, etc.).</p>
-                <span class="status status-implemented">Implementado</span>
+                <span class="status status-implemented">------------------------------------------</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Ver Lista</span>
                 </div>
@@ -136,7 +98,7 @@
             <a href="{{ route('clientes.index') }}" class="option-card">
                 <h2>Gestión de Clientes</h2>
                 <p>Visualiza y administra la información de los clientes.</p>
-                <span class="status status-implemented">Implementado</span>
+                <span class="status status-implemented">------------------------------------------</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Gestionar</span>
                 </div>
@@ -147,9 +109,9 @@
             <div class="option-card">
                 <h2>Gestión de Premios</h2>
                 <p>Administrar los premios disponibles para canjear.</p>
-                <span class="status status-pending">Pendiente</span>
+                <span class="status status-implemented">------------------------------------------</span>
                 <div style="margin-top: 10px;">
-                    <span class="btn-manage disabled">Gestionar</span>
+                    <span class="btn-manage ">Gestionar</span>
                 </div>
             </div>
 
@@ -157,29 +119,30 @@
             <div class="option-card">
                 <h2>Gestión de Áreas de Zumba</h2>
                 <p>Administra las áreas para clases de Zumba, capacidades y horarios.</p>
-                <span class="status status-pending">Pendiente</span>
+                <span class="status status-implemented">------------------------------------------</span>
                 <div style="margin-top: 10px;">
-                    <span class="btn-manage disabled">Gestionar</span>
+                    <span class="btn-manage ">Gestionar</span>
                 </div>
             </div>
 
+            <a href="{{ route('zumba.opciones') }}" class="option-card">
 
-            <div class="option-card">
+
                 <h2>Gestión de Clases de Zumba</h2>
-                <p>Define y administra las clases de Zumba, instructores y cupos.</p>
-                <span class="status status-pending">Pendiente</span>
+                <p>Define y administra las clases de Zumba, instructores y mas.</p>
+                <span class="status status-implemented">------------------------------------------</span>
                 <div style="margin-top: 10px;">
-                    <span class="btn-manage disabled">Gestionar</span>
+                    <span class="btn-manage">Gestionar</span>
                 </div>
-            </div>
 
+            </a>
 
             <div class="option-card">
                 <h2>Gestión de Instructores</h2>
                 <p>Administra la información y especialidades de los instructores.</p>
-                <span class="status status-pending">Pendiente</span>
+                <span class="status status-implemented">------------------------------------------</span>
                 <div style="margin-top: 10px;">
-                    <span class="btn-manage disabled">Gestionar</span>
+                    <span class="btn-manage ">Gestionar</span>
                 </div>
             </div>
 
@@ -187,7 +150,7 @@
 
                 <h2>Gestión de Eventos y Torneos</h2>
                 <p>Organiza y administra eventos especiales y torneos.</p>
-                <span class="status status-implemented">Implementado</span>
+                <span class="status status-implemented">------------------------------------------</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Gestionar</span>
                 </div>
@@ -198,7 +161,7 @@
 
                 <h2>Reportes y Estadísticas</h2>
                 <p>Visualiza datos importantes sobre el funcionamiento del sistema.</p>
-                <span class="status status-implemented">Implementado</span>
+                <span class="status status-implemented">------------------------------------------</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Ver Dashboard</span>
                 </div>
@@ -209,8 +172,8 @@
             <a href="{{ route('admin.churn.index') }}" class="option-card">
 
                 <h2>Tasa de abandono (Chrun)</h2>
-                <p>Visualiza analisis de Churn</p>
-                <span class="status status-implemented">Implementado</span>
+                <p>Reportes analisis de Churn | tasa de abandono</p>
+                <span class="status status-implemented">------------------------------------------</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Ver</span>
                 </div>
