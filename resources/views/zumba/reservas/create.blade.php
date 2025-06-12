@@ -130,7 +130,7 @@
 
 @section('content')
     <div class="container">
-        <h1>Crear Nueva Reserva de Zumba</h1>
+        <h1>Crear Nueva Inscripción de Zumba</h1>
 
         <div class="form-card">
             @if ($errors->any())

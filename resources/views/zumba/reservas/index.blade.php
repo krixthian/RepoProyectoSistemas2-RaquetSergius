@@ -34,7 +34,7 @@
 @section('content')
 <div class="container">
     <div class="page-header">
-        <h1>Administrar Reservas de Zumba</h1>
+        <h1>Inscripciones de Zumba</h1>
         {{-- CAMBIO: La ruta ahora apunta a zumba.reservas.create --}}
         <a href="{{ route('zumba.reservas.create') }}" class="button">Crear Nueva Reserva</a>
     </div>
