@@ -7,23 +7,21 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
+
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\ReservaController;
-
 use App\Http\Controllers\TorneoController;
 use App\Http\Controllers\EquipoController;
-
 use App\Http\Controllers\IndexEmpleadoController;
-
 use App\Http\Controllers\ClienteController;
-
 use App\Http\Controllers\Admin\ChurnController;
-
 use App\Http\Controllers\reservasControllers\ReservaControllerComp;
-
+//...
 use App\Http\Controllers\zumba\InscripcionZumbaCompController;
+use App\Http\Controllers\zumba\ReservaZumbaController; 
+
 
 Route::get('/login', function () {
     if (auth()->check()) {
@@ -57,13 +55,18 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/ver-comprobante/{cliente_id}/{comprobante_hash}', [InscripcionZumbaCompController::class, 'verComprobante'])->name('verComprobante');
         Route::post('/confirmar/{cliente_id}/{comprobante_hash}', [InscripcionZumbaCompController::class, 'confirmarInscripciones'])->name('pendientes.confirmar');
         Route::post('/rechazar/{cliente_id}/{comprobante_hash}', [InscripcionZumbaCompController::class, 'rechazarInscripciones'])->name('pendientes.rechazar');
-        
-        // ============= INICIO: RUTAS AGREGADAS =============
-        // Ruta para mostrar el formulario para agendar una sesión
+
+        // Horarios de clase
         Route::get('/agendar', [InscripcionZumbaCompController::class, 'showAgendarForm'])->name('agendar');
-        // Ruta para guardar la nueva sesión agendada
         Route::post('/agendar', [InscripcionZumbaCompController::class, 'storeAgendar'])->name('agendar.store');
-        // ============= FIN: RUTAS AGREGADAS =============
+
+        Route::get('/reservas', [ReservaZumbaController::class, 'index'])->name('reservas.index');
+
+        // Formulario para crear nueva reserva Zumba
+        Route::get('/reservas/create', [ReservaZumbaController::class, 'create'])->name('reservas.create');
+
+        // Guardar reserva Zumba
+        Route::post('/reservas', [ReservaZumbaController::class, 'store'])->name('reservas.store');
     });
 
 
