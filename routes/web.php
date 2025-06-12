@@ -57,6 +57,13 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/ver-comprobante/{cliente_id}/{comprobante_hash}', [InscripcionZumbaCompController::class, 'verComprobante'])->name('verComprobante');
         Route::post('/confirmar/{cliente_id}/{comprobante_hash}', [InscripcionZumbaCompController::class, 'confirmarInscripciones'])->name('pendientes.confirmar');
         Route::post('/rechazar/{cliente_id}/{comprobante_hash}', [InscripcionZumbaCompController::class, 'rechazarInscripciones'])->name('pendientes.rechazar');
+        
+        // ============= INICIO: RUTAS AGREGADAS =============
+        // Ruta para mostrar el formulario para agendar una sesión
+        Route::get('/agendar', [InscripcionZumbaCompController::class, 'showAgendarForm'])->name('agendar');
+        // Ruta para guardar la nueva sesión agendada
+        Route::post('/agendar', [InscripcionZumbaCompController::class, 'storeAgendar'])->name('agendar.store');
+        // ============= FIN: RUTAS AGREGADAS =============
     });
 
 

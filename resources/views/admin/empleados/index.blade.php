@@ -126,17 +126,22 @@
             </div>
 
             <a href="{{ route('zumba.opciones') }}" class="option-card">
-
-
                 <h2>Gestión de Clases de Zumba</h2>
                 <p>Define y administra las clases de Zumba, instructores y mas.</p>
                 <span class="status status-implemented">------------------------------------------</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Gestionar</span>
                 </div>
-
             </a>
-
+            
+            <a href="{{ route('zumba.agendar') }}" class="option-card">
+                <h2>Agendar Sesion de Zumba</h2>
+                <p>Permite agendar nuevas sesiones de Zumba para los clientes.</p>
+                <span class="status status-implemented">------------------------------------------</span>
+                <div style="margin-top: 10px;">
+                    <span class="btn-manage">Agendar</span>
+                </div>
+            </a>
             <div class="option-card">
                 <h2>Gestión de Instructores</h2>
                 <p>Administra la información y especialidades de los instructores.</p>
