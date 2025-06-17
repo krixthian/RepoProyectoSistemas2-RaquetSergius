@@ -11,7 +11,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\ReservaController;
-
+use App\Http\Controllers\PremioController;
 use App\Http\Controllers\TorneoController;
 use App\Http\Controllers\EquipoController;
 
@@ -121,6 +121,8 @@ Route::resource('equipos', EquipoController::class);
 Route::get('/admin/churn-analisis', [ChurnController::class, 'index'])->name('admin.churn.index');
 
 Route::resource('clientes', ClienteController::class);
+Route::resource('premios', PremioController::class);
+
 // ------------------------------------
 
 

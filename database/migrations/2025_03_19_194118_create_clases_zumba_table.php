@@ -5,9 +5,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('clases_zumba', function (Blueprint $table) {
@@ -19,22 +16,18 @@ return new class extends Migration {
             $table->time('hora_fin'); // time NOT NULL
             $table->decimal('precio', 8, 2); // decimal(8,2) NOT NULL
             $table->integer('cupo_maximo'); // int NOT NULL
-            $table->boolean('habilitado')->nullable(); // boolean
+            $table->boolean('habilitado')->nullable()->default(true); // boolean
 
-            $table->timestamp('created_at')->default(DB::raw('CURRENT_TIMESTAMP'));
-            $table->timestamp('updated_at')->default(DB::raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+            $table->timestamps();
 
-
-            $table->foreign('area_id')->references('area_id')->on('areas_zumba');
-            $table->foreign('instructor_id')->references('instructor_id')->on('instructores');
+            $table->foreign('area_id')->references('area_id')->on('areas_zumba'); 
+            $table->foreign('instructor_id')->references('instructor_id')->on('instructores'); 
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('clases_zumba');
+        Schema::dropIfExists('clases_zumba'); 
     }
 };
+
