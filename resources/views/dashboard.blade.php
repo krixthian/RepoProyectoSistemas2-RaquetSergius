@@ -107,7 +107,7 @@
     new ApexCharts(document.querySelector("#chartEmpleados"), {
         chart: { 
             type: 'donut',
-            height: '100%'
+            height: '100%' 
         },
         series: @json($empleadosData),
         labels: @json($empleadosLabels),
@@ -118,7 +118,7 @@
     new ApexCharts(document.querySelector("#chartClientesSemanales"), {
         chart: { 
             type: 'bar',
-            height: '100%'
+            height: '100%' 
         },
         series: [{ 
             name: 'Clientes', 
@@ -129,9 +129,7 @@
             labels: {
                 show: true,
                 rotate: -45,
-                style: {
-                    fontSize: '10px'
-                }
+                style: { fontSize: '10px' }
             }
         },
         plotOptions: { 
@@ -143,14 +141,14 @@
     }).render();
 
     // Gráfico de estado de clientes
-    const totalClientes = @json(array_sum($clientesEstadoData->toArray()));
+    const totalClientes = @json(array_sum($clientesEstadoData)); 
     const activos = @json($clientesEstadoData[0] ?? 0);
     const porcentajeActivos = totalClientes > 0 ? Math.round((activos / totalClientes) * 100) : 0;
 
     new ApexCharts(document.querySelector("#chartEstadoClientes"), {
         chart: { 
             type: 'radialBar',
-            height: '100%'
+            height: '100%' 
         },
         series: [porcentajeActivos],
         labels: ['Activos'],
@@ -178,7 +176,7 @@
     new ApexCharts(document.querySelector("#chartClientes"), {
         chart: { 
             type: 'bar',
-            height: '100%'
+            height: '100%' 
         },
         series: [{ 
             name: 'Reservas', 
@@ -186,11 +184,7 @@
         }],
         xaxis: { 
             categories: @json($topClientesLabels),
-            labels: {
-                style: {
-                    fontSize: '12px'
-                }
-            }
+            labels: { style: { fontSize: '12px' } }
         },
         plotOptions: { 
             bar: { 
@@ -204,7 +198,7 @@
     new ApexCharts(document.querySelector("#chartReservas"), {
         chart: { 
             type: 'line',
-            height: '100%'
+            height: '100%' 
         },
         series: [{ 
             name: 'Reservas', 
@@ -222,29 +216,25 @@
                 }
             }
         },
-        tooltip: {
-            x: {
-                format: 'dd MMM yyyy'
-            }
-        }
+        tooltip: { x: { format: 'dd MMM yyyy' } }
     }).render();
 
     // Gráfico Estados de Reservas
     new ApexCharts(document.querySelector("#chartEstados"), {
         chart: { 
             type: 'pie',
-            height: '100%'
+            height: '100%' 
         },
         series: @json($estadosData),
         labels: @json($estadosLabels),
         legend: { position: 'bottom' }
     }).render();
 
-    // Gráfico Top Canchas
+    // Gráfico Top 5 Canchas
     new ApexCharts(document.querySelector("#chartCanchas"), {
         chart: { 
             type: 'bar',
-            height: '100%'
+            height: '100%' 
         },
         series: [{ 
             name: 'Reservas', 
@@ -252,11 +242,7 @@
         }],
         xaxis: { 
             categories: @json($usoCanchasLabels),
-            labels: {
-                style: {
-                    fontSize: '12px'
-                }
-            }
+            labels: { style: { fontSize: '12px' } }
         },
         plotOptions: { 
             bar: { 
@@ -265,5 +251,6 @@
             } 
         }
     }).render();
+
 </script>
 @endpush

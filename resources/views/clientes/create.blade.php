@@ -3,7 +3,7 @@
 @section('content')
 <style>
     body {
-        background-color: #f5f5dc;
+        background-color:rgb(0, 0, 0);
     }
     .card {
         background-color: #e0f7fa;

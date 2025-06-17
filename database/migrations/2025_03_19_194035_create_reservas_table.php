@@ -11,30 +11,25 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('reservas', function (Blueprint $table) {
-            $table->id('reserva_id');
-            $table->unsignedBigInteger('cancha_id');
-            $table->unsignedBigInteger('cliente_id');
-            $table->date('fecha');
-            $table->time('hora_inicio');
-            $table->time('hora_fin');
+            $table->id('reserva_id'); 
+            $table->unsignedBigInteger('cancha_id'); 
+            $table->unsignedBigInteger('cliente_id'); 
+            $table->date('fecha'); 
+            $table->time('hora_inicio'); 
+            $table->time('hora_fin'); 
             $table->decimal('monto', 10, 2);
-            $table->string('estado', 50)->default('Pendiente de Pago');
-            //nuevos para el qr
+            $table->string('estado', 50)->default('Pendiente de Pago'); 
             $table->decimal('monto_total', 8, 2)->nullable();
             $table->string('ruta_comprobante_pago')->nullable();
 
             $table->string('metodo_pago'); // "QR/efectivo"
             $table->boolean('pago_completo')->default(false);
 
+            // Esto se encarga de created_at y updated_at automáticamente
+            $table->timestamps();
 
-
-
-            $table->timestamp('created_at')->default(DB::raw('CURRENT_TIMESTAMP'));
-            $table->timestamp('updated_at')->default(DB::raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
-
-
-            $table->foreign('cancha_id')->references('cancha_id')->on('canchas');
-            $table->foreign('cliente_id')->references('cliente_id')->on('clientes');
+            $table->foreign('cancha_id')->references('cancha_id')->on('canchas'); 
+            $table->foreign('cliente_id')->references('cliente_id')->on('clientes'); 
         });
     }
 
@@ -43,6 +38,7 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        Schema::dropIfExists('reservas');
+        Schema::dropIfExists('reservas'); 
     }
 };
+
