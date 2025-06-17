@@ -11,8 +11,17 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
+// --- MODELOS AJUSTADOS A TU PROYECTO ---
+use App\Models\ClaseZumba;
+use App\Models\Instructor;
+use App\Models\AreaZumba; // Corregido
+
+
 class InscripcionZumbaCompController extends Controller
 {
+    // ... (aquí va todo tu código existente: index, opciones, verComprobante, etc.)
+    // ... (no es necesario que lo copies de nuevo, solo asegúrate de que esté aquí)
+    
     /**
      * Muestra una lista de comprobantes de pago pendientes de revisión.
      * Cada fila es un comprobante que puede agrupar varias inscripciones.
@@ -24,8 +33,6 @@ class InscripcionZumbaCompController extends Controller
             ->with('cliente')
             ->select('cliente_id', 'ruta_comprobante_pago', DB::raw('count(*) as total_clases'), DB::raw('sum(monto_pagado) as monto_total'), DB::raw('MIN(fecha_inscripcion) as fecha_primera_inscripcion'))
             ->groupBy('cliente_id', 'ruta_comprobante_pago')
-            // --- CORRECCIÓN AQUÍ ---
-            // Ordenar por la fecha de inscripción más antigua del grupo para atender primero a los que llevan más tiempo esperando.
             ->orderBy('fecha_primera_inscripcion', 'asc');
 
         if ($request->has('cliente_nombre') && $request->cliente_nombre != '') {
@@ -49,7 +56,6 @@ class InscripcionZumbaCompController extends Controller
      */
     public function verComprobante($cliente_id, $comprobante_hash)
     {
-        // Decodificar la ruta del comprobante desde el hash de la URL
         $ruta_comprobante_pago = str_replace('-', '/', $comprobante_hash);
 
         $inscripciones = InscripcionClase::where('cliente_id', $cliente_id)
@@ -65,9 +71,6 @@ class InscripcionZumbaCompController extends Controller
         return view('zumba.revisionPagos.verComprobante', compact('inscripciones'));
     }
 
-    /**
-     * Confirma un grupo de inscripciones pendientes y notifica al cliente.
-     */
     public function confirmarInscripciones(Request $request, $cliente_id, $comprobante_hash)
     {
         $request->validate(['mensaje' => 'required|string|min:10']);
@@ -77,9 +80,6 @@ class InscripcionZumbaCompController extends Controller
             ->with('success', 'Inscripciones CONFIRMADAS y cliente notificado.');
     }
 
-    /**
-     * Rechaza un grupo de inscripciones pendientes y notifica al cliente.
-     */
     public function rechazarInscripciones(Request $request, $cliente_id, $comprobante_hash)
     {
         $request->validate(['mensaje' => 'required|string|min:10']);
@@ -89,9 +89,6 @@ class InscripcionZumbaCompController extends Controller
             ->with('success', 'Inscripciones RECHAZADAS y cliente notificado.');
     }
 
-    /**
-     * Lógica central para actualizar estado y enviar notificación.
-     */
     private function actualizarEstadoInscripciones($cliente_id, $comprobante_hash, $nuevo_estado, $mensajePersonalizado)
     {
         $ruta_comprobante_pago = str_replace('-', '/', $comprobante_hash);
@@ -108,7 +105,6 @@ class InscripcionZumbaCompController extends Controller
         DB::transaction(function () use ($inscripciones, $nuevo_estado) {
             foreach ($inscripciones as $inscripcion) {
                 $inscripcion->estado = $nuevo_estado;
-                // Si el estado es Activa y no tiene fecha de pago, se la ponemos ahora
                 if ($nuevo_estado === 'Activa' && is_null($inscripcion->fecha_pago)) {
                     $inscripcion->fecha_pago = Carbon::now();
                 }
@@ -119,9 +115,6 @@ class InscripcionZumbaCompController extends Controller
         $this->enviarNotificacion($nuevo_estado === 'Activa', $inscripciones, $mensajePersonalizado);
     }
 
-    /**
-     * Envía una notificación por WhatsApp al cliente.
-     */
     public function enviarNotificacion(bool $confirmado, $inscripciones, string $mensajePersonalizado)
     {
         $primeraInscripcion = $inscripciones->first();
@@ -165,4 +158,52 @@ class InscripcionZumbaCompController extends Controller
             Log::error("Excepción al intentar enviar WhatsApp desde InscripcionZumbaCompController: " . $e->getMessage());
         }
     }
+
+
+    // ============= INICIO: MÉTODOS AJUSTADOS PARA AGENDAR CLASES =============
+
+    /**
+     * Muestra el formulario para definir un nuevo horario de clase de Zumba.
+     */
+    public function showAgendarForm()
+    {
+        // Obtenemos los datos necesarios para los menús desplegables del formulario
+        $instructores = Instructor::all();
+        // Usamos tu modelo AreaZumba y filtramos por las que están disponibles
+        $areas = AreaZumba::where('disponible', true)->get();
+        
+        $diasDeLaSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+        // Retornamos la vista y le pasamos los datos
+        return view('zumba.agendar', compact('instructores', 'areas', 'diasDeLaSemana'));
+    }
+
+    /**
+     * Guarda en la base de datos el nuevo horario de clase.
+     */
+    public function storeAgendar(Request $request)
+    {
+        // 1. Validamos los datos del formulario (ajustado a tu modelo ClaseZumba)
+        $validatedData = $request->validate([
+            'area_id'       => 'required|exists:areas_zumba,area_id',
+            'instructor_id' => 'required|exists:instructores,instructor_id',
+            'diasemama'     => 'required|string',
+            'hora_inicio'   => 'required|date_format:H:i',
+            'hora_fin'      => 'required|date_format:H:i|after:hora_inicio',
+            'precio'        => 'required|numeric|min:0',
+            'cupo_maximo'   => 'required|integer|min:1',
+        ]);
+        
+        // Asignamos el estado 'habilitado' por defecto, como en tu modelo
+        $validatedData['habilitado'] = true;
+
+        // 2. Creamos la nueva clase en la base de datos
+        ClaseZumba::create($validatedData);
+
+        // 3. Redirigimos al usuario con un mensaje de éxito
+        return redirect()->route('zumba.opciones')
+                       ->with('success', '¡Nuevo horario de clase definido correctamente!');
+    }
+
+    // ============= FIN: MÉTODOS AJUSTADOS =============
 }

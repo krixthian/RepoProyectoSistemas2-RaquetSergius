@@ -73,7 +73,7 @@
 
         <div class="management-options">
 
-            <a href="{{ route('reservas.index') }}" class="option-card">
+            <a href="{{ route('zumba.reservas.index') }}" class="option-card">
                 <h2>Administrar Reservas</h2>
                 <br>
                 <p>Administra las reservas y sus datos.</p>
