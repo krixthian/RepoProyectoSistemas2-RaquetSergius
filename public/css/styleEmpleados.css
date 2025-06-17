@@ -2,12 +2,12 @@
 <style>
     /* Reset some bootstrap defaults */
     .table thead th {
-        border-bottom: 2px solid #dee2e6;
+        border-bottom: 2px solid #555;
     }
     /* Page wrapper container */
     .page-wrapper {
         text-align: center;
-        background: linear-gradient(135deg, #9adff0 0%, hsl(189, 59%, 77%) 100%);
+        background: linear-gradient(135deg, #111 0%, #222 100%) !important;
         min-height: 100vh;
         padding: 50px 20px;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -16,12 +16,13 @@
     }
     .page-container {
         text-align: center;
-        background: #fff;
+        background: #1a1a1a;
         max-width: 1100px;
         width: 100%;
         border-radius: 12px;
-        box-shadow: 0 10px 35px rgba(0,0,0,0.1);
+        box-shadow: 0 10px 35px rgba(0,0,0,0.7);
         padding: 30px 40px;
+        color: #eee;
     }
     /* Header styles */
     .page-header {
@@ -33,7 +34,7 @@
         gap: 15px;
     }
     .header-info h1 {
-        color: #0db3be;
+        color: #1ca891;
         font-size: 2.5rem;
         font-weight: 700;
         display: flex;
@@ -42,7 +43,7 @@
     }
     .header-info .subtitle {
         font-size: 1.1rem;
-        color: #6c757d;
+        color: #999;
         margin-top: 6px;
     }
     .btn-new-employee {
@@ -61,17 +62,18 @@
     .btn-new-employee:hover,
     .btn-new-employee:focus {
         background-color: #146c43;
-        box-shadow: 0 8px 18px rgba(20,108,67,0.7);
-        color: white;
+        box-shadow: 0 8px 18px rgba(20, 108, 67, 0.7);
+        color: #fff;
         text-decoration: none;
     }
     /* Card styles */
     .card {
         border-radius: 12px;
-        box-shadow: 0 8px 20px rgba(0,0,0,0.05);
-        background-color: #fff;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+        background-color: #1a1a1a;
         display: flex;
         flex-direction: column;
+        color: #eee;
     }
     .card-header {
         background: #1296be;
@@ -91,8 +93,8 @@
     /* Alert Success */
     .alert-success {
         padding: 15px 20px;
-        background-color: #d1e7dd;
-        color: #0f5132;
+        background-color: #14532d;
+        color: #bbf7ba;
         border-radius: 8px;
         margin: 20px 30px;
         position: relative;
@@ -113,7 +115,7 @@
         position: absolute;
         top: 10px;
         right: 15px;
-        color: #0f5132;
+        color: #bbf7ba;
         font-weight: 700;
     }
     /* Table container */
@@ -126,31 +128,32 @@
         border-collapse: separate;
         border-spacing: 0 10px;
         font-size: 1rem;
-        color: #212529;
+        color: #eee;
         min-width: 900px;
     }
     .employees-table thead tr th {
         padding: 14px 20px;
         text-align: left;
-        color: #495057;
+        color: #999;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.05em;
         border-bottom: none;
     }
     .employees-table tbody tr {
-        background-color: #f8f9fa;
+        background-color: #2a2a2a;
         border-radius: 10px;
         transition: box-shadow 0.3s ease;
-        box-shadow: 0 1px 4px rgb(0 0 0 / 0.1);
+        box-shadow: 0 1px 4px rgb(0 0 0 / 0.5);
     }
     .employees-table tbody tr:hover {
-        box-shadow: 0 8px 15px rgba(0,0,0,0.1);
-        background-color: #e9ecef;
+        box-shadow: 0 8px 15px rgba(0,0,0,0.7);
+        background-color: #333;
     }
     .employees-table tbody tr td {
         padding: 15px 20px;
         vertical-align: middle;
+        color: #eee;
     }
     /* Avatar and name */
     .employee-name {
@@ -158,13 +161,13 @@
         align-items: center;
         gap: 15px;
         font-weight: 600;
-        color: #343a40;
+        color: #eee;
     }
     .employee-name .avatar {
         width: 42px;
         height: 42px;
-        background-color: #b3d7ff;
-        color: #0056b3;
+        background-color: #1ca891;
+        color: #fff;
         border-radius: 50%;
         display: flex;
         align-items: center;
@@ -176,11 +179,11 @@
     }
     .employee-id {
         font-size: 0.8rem;
-        color: #6c757d;
+        color: #999;
     }
     /* Links */
     .link-primary {
-        color: #0d6efd;
+        color: #1ca891;
         text-decoration: none;
         font-weight: 500;
     }
@@ -196,7 +199,7 @@
         border-radius: 20px;
         font-size: 0.85rem;
         font-weight: 600;
-        color: white;
+        color: #fff;
         user-select: none;
         white-space: nowrap;
     }
@@ -229,15 +232,15 @@
         padding: 6px 10px;
         border-radius: 50%;
         transition: background-color 0.25s ease;
-        color: #495057;
+        color: #eee;
     }
     .btn-action.edit:hover {
         background-color: #ffc107;
-        color: #212529;
+        color: #000;
     }
     .btn-action.delete:hover {
         background-color: #dc3545;
-        color: white;
+        color: #fff;
     }
     .btn-action i {
         pointer-events: none;
@@ -250,31 +253,33 @@
     .empty-state {
         text-align: center;
         padding: 50px 0;
-        color: #6c757d;
+        color: #999;
     }
     .empty-state i {
         font-size: 3.5rem;
         margin-bottom: 20px;
         display: inline-block;
-        color: #adb5bd;
+        color: #666;
     }
     .empty-state h3 {
         font-weight: 700;
         font-size: 1.8rem;
         margin-bottom: 10px;
+        color: #eee;
     }
     .empty-state p {
         font-size: 1rem;
         margin-bottom: 25px;
+        color: #999;
     }
     .btn-create-first {
         padding: 12px 28px;
         background-color: #0d6efd;
-        color: white;
+        color: #fff;
         font-weight: 600;
         border-radius: 40px;
         font-size: 1rem;
-        box-shadow: 0 6px 15px rgba(13,110,253,0.5);
+        box-shadow: 0 6px 15px rgba(13, 110, 253, 0.5);
         text-decoration: none;
         display: inline-flex;
         align-items: center;
@@ -290,9 +295,10 @@
     /* Card Footer */
     .card-footer {
         padding: 15px 30px;
-        border-top: 1px solid #dee2e6;
+        border-top: 1px solid #555;
         font-size: 0.9rem;
-        color: #6c757d;
+        color: #999;
         font-weight: 500;
     }
 </style>
+@endpush
