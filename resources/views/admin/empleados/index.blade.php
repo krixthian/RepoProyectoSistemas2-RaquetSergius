@@ -105,17 +105,25 @@
 
             </a>
 
+            <a href="{{ route('clientes.opciones') }}" class="option-card">
+                <h2>Puntos y Premios</h2>
+                <p>Gestiona los puntos de fidelidad y el canje de premios para clientes.</p>
+                <span class="status status-implemented">------------------------------------------</span>
+                <div style="margin-top: 10px;">
+                    <span class="btn-manage">Ir a Opciones</span>
+                </div>
+            </a>
 
             <div class="option-card">
-    <h2>Gestión de Premios</h2>
-    <p>Administrar los premios disponibles para canjear.</p>
-    <span class="status status-implemented"> ------------------------------------------</span>
-    <div style="margin-top: 10px">
-        <a href="{{ route('premios.index') }}" class="btn-manage">
-            Gestionar
-        </a>
-    </div>
-</div>
+                <h2>Gestión de Premios</h2>
+                <p>Administrar los premios disponibles para canjear.</p>
+                <span class="status status-implemented"> ------------------------------------------</span>
+                <div style="margin-top: 10px">
+                    <a href="{{ route('premios.index') }}" class="btn-manage">
+                        Gestionar
+                    </a>
+                </div>
+            </div>
 
 
 
@@ -136,7 +144,7 @@
                     <span class="btn-manage">Gestionar</span>
                 </div>
             </a>
-            
+
             <a href="{{ route('zumba.agendar') }}" class="option-card">
                 <h2>Agendar Sesion de Zumba</h2>
                 <p>Permite agendar nuevas sesiones de Zumba para los clientes.</p>

@@ -21,9 +21,9 @@ use App\Http\Controllers\IndexEmpleadoController;
 use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\Admin\ChurnController;
 use App\Http\Controllers\reservasControllers\ReservaControllerComp;
-//...
 use App\Http\Controllers\zumba\InscripcionZumbaCompController;
-use App\Http\Controllers\zumba\ReservaZumbaController; 
+use App\Http\Controllers\zumba\ReservaZumbaController;
+use App\Http\Controllers\PuntosController;
 
 
 Route::get('/login', function () {
@@ -36,7 +36,22 @@ Route::get('/login', function () {
 
 // --- RUTAS PROTEGIDAS  ---
 Route::middleware(['auth'])->group(function () {
+    //opciones clientes
+    Route::prefix('/clientes')->name('clientes.')->group(function () {
+        Route::get('/opciones', [PuntosController::class, 'opciones'])->name('opciones');
+    });
 
+    //puntos y canjes
+
+    Route::prefix('/puntos')->name('puntos.')->group(function () {
+        Route::get('/sumar-restar', [PuntosController::class, 'showSumarRestarForm'])->name('sumar-restar.form');
+        Route::post('/sumar-restar', [PuntosController::class, 'storePuntos'])->name('sumar-restar.store');
+        Route::get('/canjear', [PuntosController::class, 'showCanjearForm'])->name('canjear.form');
+        Route::post('/canjear', [PuntosController::class, 'storeCanje'])->name('canjear.store');
+        Route::get('/historial-canjes', [PuntosController::class, 'historialCanjes'])->name('canjes.historial');
+        Route::get('/historial-log', [PuntosController::class, 'historialPuntosLog'])->name('log.historial');
+
+    });
 
     Route::get('/', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
     Route::get('/admin/empleados', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
