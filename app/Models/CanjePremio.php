@@ -9,7 +9,7 @@ class CanjePremio extends Model
 {
     use HasFactory;
 
-    protected $table = 'canjes_premios'; // Nombre de la tabla en la base de datos
+    protected $table = 'canje_premios'; // Nombre de la tabla en la base de datos
     protected $primaryKey = 'canje_id';
     public $timestamps = false; // Deshabilitado por definición explícita en migración
 
