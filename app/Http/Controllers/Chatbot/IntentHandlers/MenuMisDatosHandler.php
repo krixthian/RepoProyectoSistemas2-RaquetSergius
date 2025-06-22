@@ -33,11 +33,12 @@ class MenuMisDatosHandler implements IntentHandlerInterface
         } else {
             $nombreCliente = $cliente->nombre ?? 'No registrado';
             $emailCliente = $cliente->email ?? 'No registrado';
+            $puntosCliente = $cliente->puntos ?? 'No registrados';
 
             $responseText = "Aquí están tus datos actuales:\n";
             $responseText .= "👤 Nombre: " . $nombreCliente . "\n";
-            $responseText .= "📧 Email: " . $emailCliente;
-
+            $responseText .= "📧 Email: " . $emailCliente . "\n";
+            $responseText .= "📧 Puntos: " . $puntosCliente . "\n";
             // Primer mensaje: los datos del cliente
             $messagesToSend[] = [
                 'fulfillmentText' => $responseText,
