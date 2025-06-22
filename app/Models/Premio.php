@@ -42,8 +42,9 @@ class Premio extends Model
     ];
 
     // Relaciones
-    public function claseGratis()
+    public function claseZumbaGratis()
     {
+        // El 'clase_gratis_id' de la tabla 'premios' se relaciona con 'clase_id' en 'clases_zumba'
         return $this->belongsTo(ClaseZumba::class, 'clase_gratis_id', 'clase_id');
     }
 
@@ -51,4 +52,5 @@ class Premio extends Model
     {
         return $this->hasMany(CanjePremio::class, 'premio_id', 'premio_id');
     }
+
 }

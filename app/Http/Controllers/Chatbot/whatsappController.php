@@ -13,7 +13,7 @@ use Google\Auth\HttpHandler\HttpHandlerFactory;
 use Google\Cloud\Dialogflow\V2\Value;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage; // Para guardar imágenes
-
+use App\Http\Controllers\Chatbot\IntentHandlers\MostrarPremiosHandler;
 
 //imports de los handlers
 use App\Chatbot\IntentHandlerInterface;
@@ -94,6 +94,7 @@ class whatsappController extends Controller
         'CancelarReserva_Confirmar_No' => \App\Http\Controllers\Chatbot\IntentHandlers\CancelarReservaHandler::class,
 
         'Saludo' => \App\Http\Controllers\Chatbot\IntentHandlers\SaludoHandler::class,
+        'Despedida' => \App\Http\Controllers\Chatbot\IntentHandlers\DespedidadHandler::class,
         'Default Fallback Intent' => \App\Http\Controllers\Chatbot\IntentHandlers\DefaultFallbackIntentHandler::class,
 
         'Consulta Reserva' => \App\Http\Controllers\Chatbot\IntentHandlers\ConsultaReservaHandler::class,
@@ -127,6 +128,9 @@ class whatsappController extends Controller
         'Chatbot_MisDatos_SolicitarEmail' => \App\Http\Controllers\Chatbot\IntentHandlers\MisDatosSolicitarEmailHandler::class,
         'Chatbot_MisDatos_CapturarEmail' => \App\Http\Controllers\Chatbot\IntentHandlers\MisDatosCapturarEmailHandler::class,
 
+
+        //PREMIOS PUNTOS
+        'Premios_Consultar_Disponibles' => MostrarPremiosHandler::class,
 
 
     ];
