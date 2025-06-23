@@ -7,23 +7,24 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
+
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\ReservaController;
+
 use App\Http\Controllers\PremioController;
+
 use App\Http\Controllers\TorneoController;
 use App\Http\Controllers\EquipoController;
-
 use App\Http\Controllers\IndexEmpleadoController;
-
 use App\Http\Controllers\ClienteController;
-
 use App\Http\Controllers\Admin\ChurnController;
-
 use App\Http\Controllers\reservasControllers\ReservaControllerComp;
-
 use App\Http\Controllers\zumba\InscripcionZumbaCompController;
+use App\Http\Controllers\zumba\ReservaZumbaController;
+use App\Http\Controllers\PuntosController;
+
 
 Route::get('/login', function () {
     if (auth()->check()) {
@@ -35,7 +36,22 @@ Route::get('/login', function () {
 
 // --- RUTAS PROTEGIDAS  ---
 Route::middleware(['auth'])->group(function () {
+    //opciones clientes
+    Route::prefix('/clientes')->name('clientes.')->group(function () {
+        Route::get('/opciones', [PuntosController::class, 'opciones'])->name('opciones');
+    });
 
+    //puntos y canjes
+
+    Route::prefix('/puntos')->name('puntos.')->group(function () {
+        Route::get('/sumar-restar', [PuntosController::class, 'showSumarRestarForm'])->name('sumar-restar.form');
+        Route::post('/sumar-restar', [PuntosController::class, 'storePuntos'])->name('sumar-restar.store');
+        Route::get('/canjear', [PuntosController::class, 'showCanjearForm'])->name('canjear.form');
+        Route::post('/canjear', [PuntosController::class, 'storeCanje'])->name('canjear.store');
+        Route::get('/historial-canjes', [PuntosController::class, 'historialCanjes'])->name('canjes.historial');
+        Route::get('/historial-log', [PuntosController::class, 'historialPuntosLog'])->name('log.historial');
+
+    });
 
     Route::get('/', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
     Route::get('/admin/empleados', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
@@ -57,6 +73,18 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/ver-comprobante/{cliente_id}/{comprobante_hash}', [InscripcionZumbaCompController::class, 'verComprobante'])->name('verComprobante');
         Route::post('/confirmar/{cliente_id}/{comprobante_hash}', [InscripcionZumbaCompController::class, 'confirmarInscripciones'])->name('pendientes.confirmar');
         Route::post('/rechazar/{cliente_id}/{comprobante_hash}', [InscripcionZumbaCompController::class, 'rechazarInscripciones'])->name('pendientes.rechazar');
+
+        // Horarios de clase
+        Route::get('/agendar', [InscripcionZumbaCompController::class, 'showAgendarForm'])->name('agendar');
+        Route::post('/agendar', [InscripcionZumbaCompController::class, 'storeAgendar'])->name('agendar.store');
+
+        Route::get('/reservas', [ReservaZumbaController::class, 'index'])->name('reservas.index');
+
+        // Formulario para crear nueva reserva Zumba
+        Route::get('/reservas/create', [ReservaZumbaController::class, 'create'])->name('reservas.create');
+
+        // Guardar reserva Zumba
+        Route::post('/reservas', [ReservaZumbaController::class, 'store'])->name('reservas.store');
     });
 
 

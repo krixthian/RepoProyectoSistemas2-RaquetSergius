@@ -1,257 +1,215 @@
-{{-- resources/views/dashboard.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Dashboard | Raquet Sergius')
+@section('title', 'Reportes y Estadísticas')
 
 @push('styles')
-<style>
-    .card { 
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-        margin-bottom: 1.5rem;
-    }
-    .summary-card { 
-        border-left: 4px solid #4e73df; 
-        height: 100%;
-    }
-    .chart-container {
-        height: 200px;
-    }
-</style>
+    <style>
+        .report-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .report-card {
+            background-color: var(--surface-color);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .report-card h3 {
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            color: var(--blueraquet-color);
+        }
+
+        .report-card .stat {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        .report-card .sub-stat {
+            font-size: 0.9rem;
+            color: var(--text-muted-color);
+        }
+
+        .filter-card {
+            background-color: var(--surface-color);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 2rem;
+        }
+
+        .filter-form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            align-items: flex-end;
+        }
+    </style>
 @endpush
 
 @section('content')
-<div class="container py-4">
-    <h1 class="mb-4">Dashboard Completo</h1>
+    <div class="container">
+        <div class="welcome-message">
+            <h1 style="color: var(--blueraquet-color);">Reportes y Estadísticas</h1>
+            <p>Análisis financiero y de demanda para Wally y Zumba.</p>
+        </div>
 
-    <!-- Sección de resumen -->
-    <div class="row mb-4">
-        <!-- Empleados por rol -->
-        <div class="col-md-4 mb-3">
-            <div class="card summary-card h-100">
-                <div class="card-body">
-                    <h5 class="card-title">Empleados</h5>
-                    <div id="chartEmpleados" class="chart-container"></div>
+        <div class="filter-card">
+            <form action="{{ route('dashboard') }}" method="GET" class="filter-form">
+                <div>
+                    <label for="fecha_inicio">Fecha de Inicio</label>
+                    <input type="date" name="fecha_inicio" value="{{ $fechaInicio }}" class="form-control">
                 </div>
+                <div>
+                    <label for="fecha_fin">Fecha de Fin</label>
+                    <input type="date" name="fecha_fin" value="{{ $fechaFin }}" class="form-control">
+                </div>
+                <button type="submit" class="button">Filtrar</button>
+            </form>
+        </div>
+
+        <div class="report-grid mb-4">
+            <div class="report-card text-center">
+                <h3>Ingresos Totales</h3>
+                <p class="stat">Bs. {{ number_format($ingresosTotales, 2) }}</p>
+            </div>
+            <div class="report-card text-center">
+                <h3>Ingresos por Wally</h3>
+                <p class="stat">Bs. {{ number_format($ingresosReservas, 2) }}</p>
+                <p class="sub-stat">{{ $totalReservas }} reservas pagadas</p>
+            </div>
+            <div class="report-card text-center">
+                <h3>Ingresos por Zumba</h3>
+                <p class="stat">Bs. {{ number_format($ingresosZumba, 2) }}</p>
+                <p class="sub-stat">{{ $totalInscripciones }} inscripciones pagadas</p>
             </div>
         </div>
 
-        <!-- Registro de clientes -->
-        <div class="col-md-4 mb-3">
-            <div class="card summary-card h-100">
-                <div class="card-body">
-                    <h5 class="card-title">Registro de Clientes (por semana)</h5>
-                    <div id="chartClientesSemanales" class="chart-container"></div>
-                </div>
+        <div class="report-grid">
+            <div class="report-card" style="grid-column: 1 / -1;">
+                <h3>Ingresos Diarios (Bs.)</h3>
+                <canvas id="ingresosDiariosChart"></canvas>
+            </div>
+            <div class="report-card">
+                <h3>Demanda de Canchas por Hora</h3>
+                <canvas id="demandaHoraChart"></canvas>
+            </div>
+            <div class="report-card">
+                <h3>Reservas por Cancha</h3>
+                <canvas id="reservasCanchaChart"></canvas>
+            </div>
+            <div class="report-card">
+                <h3>Inscripciones por Clase de Zumba</h3>
+                <canvas id="demandaZumbaChart"></canvas>
             </div>
         </div>
 
-        <!-- Estado de clientes -->
-        <div class="col-md-4 mb-3">
-            <div class="card summary-card h-100">
-                <div class="card-body">
-                    <h5 class="card-title">Estado de Clientes</h5>
-                    <div id="chartEstadoClientes" class="chart-container"></div>
-                </div>
-            </div>
-        </div>
     </div>
-
-    <div class="row gy-4">
-        <!-- Top 5 Clientes -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">Top 5 Clientes</div>
-                <div class="card-body">
-                    <div id="chartClientes" style="height: 300px;"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Reservas por Fecha -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">Reservas por Fecha</div>
-                <div class="card-body">
-                    <div id="chartReservas" style="height: 300px;"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Estado de Reservas -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">Estado de Reservas</div>
-                <div class="card-body">
-                    <div id="chartEstados" style="height: 300px;"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Top 5 Canchas -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">Top 5 Canchas</div>
-                <div class="card-body">
-                    <div id="chartCanchas" style="height: 300px;"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-<script>
-    // Gráfico de empleados por rol
-    new ApexCharts(document.querySelector("#chartEmpleados"), {
-        chart: { 
-            type: 'donut',
-            height: '100%' 
-        },
-        series: @json($empleadosData),
-        labels: @json($empleadosLabels),
-        legend: { position: 'bottom' }
-    }).render();
+    {{-- Incluir Chart.js desde CDN --}}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    // Gráfico de clientes por semana
-    new ApexCharts(document.querySelector("#chartClientesSemanales"), {
-        chart: { 
-            type: 'bar',
-            height: '100%' 
-        },
-        series: [{ 
-            name: 'Clientes', 
-            data: @json($semanasData) 
-        }],
-        xaxis: { 
-            categories: @json($semanasLabels),
-            labels: {
-                show: true,
-                rotate: -45,
-                style: { fontSize: '10px' }
-            }
-        },
-        plotOptions: { 
-            bar: { 
-                borderRadius: 4,
-                horizontal: false
-            } 
-        }
-    }).render();
-
-    // Gráfico de estado de clientes
-const totalClientes = @json(array_sum($clientesEstadoData->toArray()));
-
-    const activos = @json($clientesEstadoData[0] ?? 0);
-    const porcentajeActivos = totalClientes > 0 ? Math.round((activos / totalClientes) * 100) : 0;
-
-    new ApexCharts(document.querySelector("#chartEstadoClientes"), {
-        chart: { 
-            type: 'radialBar',
-            height: '100%' 
-        },
-        series: [porcentajeActivos],
-        labels: ['Activos'],
-        plotOptions: {
-            radialBar: {
-                hollow: { size: '70%' },
-                dataLabels: {
-                    name: { 
-                        fontSize: '16px',
-                        show: true
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const chartOptions = {
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: 'var(--text-color)'
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        ticks: {
+                            color: 'var(--text-muted-color)'
+                        },
+                        grid: {
+                            color: 'var(--border-color)'
+                        }
                     },
-                    value: { 
-                        fontSize: '24px',
-                        show: true,
-                        formatter: function(val) {
-                            return val.toFixed(0) + '%';
+                    x: {
+                        ticks: {
+                            color: 'var(--text-muted-color)'
+                        },
+                        grid: {
+                            color: 'var(--border-color)'
                         }
                     }
                 }
-            }
-        }
-    }).render();
+            };
 
-    // Gráfico Top 5 Clientes
-    new ApexCharts(document.querySelector("#chartClientes"), {
-        chart: { 
-            type: 'bar',
-            height: '100%' 
-        },
-        series: [{ 
-            name: 'Reservas', 
-            data: @json($topClientesData) 
-        }],
-        xaxis: { 
-            categories: @json($topClientesLabels),
-            labels: { style: { fontSize: '12px' } }
-        },
-        plotOptions: { 
-            bar: { 
-                borderRadius: 4,
-                horizontal: true
-            } 
-        }
-    }).render();
+            // 1. Gráfico de Ingresos Diarios
+            new Chart(document.getElementById('ingresosDiariosChart'), {
+                type: 'line',
+                data: {
+                    labels: @json($ingresosDiariosData->keys()),
+                    datasets: [{
+                        label: 'Ingresos Totales (Bs)',
+                        data: @json($ingresosDiariosData->values()),
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.2)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: chartOptions
+            });
 
-    // Gráfico Reservas por Fecha
-    new ApexCharts(document.querySelector("#chartReservas"), {
-        chart: { 
-            type: 'line',
-            height: '100%' 
-        },
-        series: [{ 
-            name: 'Reservas', 
-            data: @json($reservasFechaData) 
-        }],
-        xaxis: { 
-            categories: @json($reservasFechaLabels),
-            type: 'datetime',
-            labels: {
-                datetimeFormatter: {
-                    year: 'yyyy',
-                    month: 'MMM \'yy',
-                    day: 'dd MMM',
-                    hour: 'HH:mm'
+            // 2. Gráfico de Demanda por Hora
+            new Chart(document.getElementById('demandaHoraChart'), {
+                type: 'bar',
+                data: {
+                    labels: [...Array(24).keys()].map(h => `${h}:00`),
+                    datasets: [{
+                        label: 'Nº de Reservas',
+                        data: @json(array_values($horasDelDia)),
+                        backgroundColor: '#2ecc71'
+                    }]
+                },
+                options: chartOptions
+            });
+
+            // 3. Gráfico de Reservas por Cancha
+            new Chart(document.getElementById('reservasCanchaChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: @json($reservasPorCancha->pluck('nombre')),
+                    datasets: [{
+                        label: 'Reservas',
+                        data: @json($reservasPorCancha->pluck('reservas_count')),
+                        backgroundColor: ['#e74c3c', '#f1c40f', '#9b59b6', '#1abc9c', '#34495e']
+                    }]
+                },
+                options: {
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: 'var(--text-color)'
+                            }
+                        }
+                    }
                 }
-            }
-        },
-        tooltip: { x: { format: 'dd MMM yyyy' } }
-    }).render();
-
-    // Gráfico Estados de Reservas
-    new ApexCharts(document.querySelector("#chartEstados"), {
-        chart: { 
-            type: 'pie',
-            height: '100%' 
-        },
-        series: @json($estadosData),
-        labels: @json($estadosLabels),
-        legend: { position: 'bottom' }
-    }).render();
-
-    // Gráfico Top 5 Canchas
-    new ApexCharts(document.querySelector("#chartCanchas"), {
-        chart: { 
-            type: 'bar',
-            height: '100%' 
-        },
-        series: [{ 
-            name: 'Reservas', 
-            data: @json($usoCanchasData) 
-        }],
-        xaxis: { 
-            categories: @json($usoCanchasLabels),
-            labels: { style: { fontSize: '12px' } }
-        },
-        plotOptions: { 
-            bar: { 
-                borderRadius: 4,
-                horizontal: true
-            } 
-        }
-    }).render();
-
-</script>
+            });
+            new Chart(document.getElementById('demandaZumbaChart'), {
+                type: 'bar',
+                data: {
+                    labels: @json($inscripcionesPorClase->map(fn($clase) => $clase->dia_semana . ' ' . \Carbon\Carbon::parse($clase->hora_inicio)->format('H:i'))),
+                    datasets: [{
+                        label: 'Nº de Inscripciones',
+                        data: @json($inscripcionesPorClase->pluck('inscripciones_count')),
+                        backgroundColor: '#e67e22'
+                    }]
+                },
+                options: chartOptions
+            });
+        });
+    </script>
 @endpush

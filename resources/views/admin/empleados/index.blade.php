@@ -105,41 +105,33 @@
 
             </a>
 
-
-            <div class="option-card">
-    <h2>Gestión de Premios</h2>
-    <p>Administrar los premios disponibles para canjear.</p>
-    <span class="status status-implemented"> ------------------------------------------</span>
-    <div style="margin-top: 10px">
-        <a href="{{ route('premios.index') }}" class="btn-manage">
-            Gestionar
-        </a>
-    </div>
-</div>
-
-
-
-            <div class="option-card">
-                <h2>Gestión de Áreas de Zumba</h2>
-                <p>Administra las áreas para clases de Zumba, capacidades y horarios.</p>
+            <a href="{{ route('clientes.opciones') }}" class="option-card">
+                <h2>Puntos y Premios</h2>
+                <p>Gestiona los puntos de fidelidad y el canje de premios para clientes.</p>
                 <span class="status status-implemented">------------------------------------------</span>
                 <div style="margin-top: 10px;">
-                    <span class="btn-manage ">Gestionar</span>
+                    <span class="btn-manage">Ir a Opciones</span>
                 </div>
-            </div>
+            </a>
+
 
             <a href="{{ route('zumba.opciones') }}" class="option-card">
-
-
                 <h2>Gestión de Clases de Zumba</h2>
                 <p>Define y administra las clases de Zumba, instructores y mas.</p>
                 <span class="status status-implemented">------------------------------------------</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Gestionar</span>
                 </div>
-
             </a>
 
+            <a href="{{ route('zumba.agendar') }}" class="option-card">
+                <h2>Agendar Sesion de Zumba</h2>
+                <p>Permite agendar nuevas sesiones de Zumba para los clientes.</p>
+                <span class="status status-implemented">------------------------------------------</span>
+                <div style="margin-top: 10px;">
+                    <span class="btn-manage">Agendar</span>
+                </div>
+            </a>
             <div class="option-card">
                 <h2>Gestión de Instructores</h2>
                 <p>Administra la información y especialidades de los instructores.</p>
