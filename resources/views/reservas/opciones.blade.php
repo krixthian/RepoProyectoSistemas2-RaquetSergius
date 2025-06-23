@@ -96,14 +96,14 @@
             </a>
 
 
-            <a href="{{ route('clientes.index') }}" class="option-card">
-                <h2>sadffdsdsfdfsfdss</h2>
-                <p>asafsddfsadfsdfssdfdsf</p>
-                <span class="status status-implemented">------------------------------------------</span>
+
+            <a href="{{ route('canchas.disponibilidad') }}" class="option-card">
+                <h2>Disponibilidad de Canchas</h2>
+                <p>Ver calendario de canchas disponibles</p>
+                <span class="status status-implemented">----------------------------------------</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Gestionar</span>
                 </div>
-
             </a>
 
 

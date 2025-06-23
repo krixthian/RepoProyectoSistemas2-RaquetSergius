@@ -4,38 +4,59 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Cancha extends Model
 {
     use HasFactory;
 
+    /**
+     * El nombre de la tabla asociada con el modelo.
+     *
+     * @var string
+     */
     protected $table = 'canchas';
-    protected $primaryKey = 'cancha_id';
-    // ... (fillable, casts, etc. como los tenías) ...
-
 
     /**
-     * Relación: Una Cancha puede estar en muchas Reservas (via tabla pivote).
-     * (Corregida)
+     * La clave primaria para el modelo.
+     *
+     * @var string
      */
-    public function reservas(): BelongsToMany
-    {
-        // --- CORRECCIÓN ---
-        return $this->belongsToMany(
-            Reserva::class,
-            'reservas_canchas', // Nombre correcto de la tabla pivote
-            'cancha_id',        // Clave foránea en pivote para este modelo (Cancha)
-            'reserva_id'
-        )        // Clave foránea en pivote para modelo relacionado (Reserva)
-            ->withPivot('precio_total', 'reserva_cancha_id') // Campos extra en pivote
-            ->withTimestamps();      // Pivote tiene timestamps
-    }
+    protected $primaryKey = 'cancha_id';
+
+    /**
+     * Los atributos que se pueden asignar masivamente.
+     * ¡Importante! Asegúrate de que estos campos coincidan con los de tu tabla 'canchas'.
+     *
+     * @var array
+     */
+    protected $fillable = [
+        'nombre',
+        'descripcion',
+        'precio_hora',
+        'capacidad',
+        'disponible',
+    ];
+
+    /**
+     * Los atributos que deben ser convertidos a tipos nativos.
+     *
+     * @var array
+     */
     protected $casts = [
         'disponible' => 'boolean',
         'precio_hora' => 'decimal:2',
         'capacidad' => 'integer',
     ];
 
-
+    /**
+     * --- CORRECCIÓN APLICADA ---
+     * Define la relación "uno a muchos" con el modelo Reserva.
+     * Una Cancha puede tener muchas Reservas.
+     */
+    public function reservas()
+    {
+        // Esta es la relación correcta porque la tabla 'reservas' tiene una
+        // clave foránea 'cancha_id' que apunta directamente a esta tabla.
+        return $this->hasMany(Reserva::class, 'cancha_id', 'cancha_id');
+    }
 }
