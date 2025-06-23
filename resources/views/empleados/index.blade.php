@@ -12,6 +12,17 @@
                 <i class="fas fa-plus-circle me-2"></i>Nuevo Empleado
             </a>
         </header>
+        <!-- Buscador por teléfono -->
+<form method="GET" action="{{ route('empleados.index') }}" style="margin: 20px 0; display: flex; gap: 10px; align-items: center;">
+    <input type="text" name="telefono" placeholder="Buscar por teléfono..."
+           value="{{ request('telefono') }}"
+           style="padding: 10px; background: #333; color: #fff; border: 1px solidrgb(82, 189, 231); border-radius: 5px; width: 250px;">
+    <button type="submit"
+            style="padding: 10px 20px; background:rgb(119, 222, 253); color: #fff; border: none; border-radius: 5px; font-weight: bold;">
+        Buscar
+    </button>
+</form>
+
         
 
         <section class="card">

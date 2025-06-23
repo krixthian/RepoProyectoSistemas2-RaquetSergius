@@ -8,9 +8,16 @@ use Illuminate\Support\Facades\Hash;
 
 class EmpleadoController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $empleados = Empleado::all();
+        $query = Empleado::query();
+
+        if ($request->has('telefono') && $request->telefono != '') {
+            $query->where('telefono', 'like', '%' . $request->telefono . '%');
+        }
+
+        $empleados = $query->get();
+
         return view('empleados.index', compact('empleados'));
     }
 

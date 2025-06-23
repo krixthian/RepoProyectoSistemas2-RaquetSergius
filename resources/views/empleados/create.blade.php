@@ -18,7 +18,7 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('empleados.store') }}" class="p-4 rounded" style="background-color: #fffaf0;">
+        <form method="POST" action="{{ route('empleados.store') }}" class="p-4 rounded" style="background-color:rgb(0, 0, 0);">
             @csrf
             @include('empleados.form')
         </form>

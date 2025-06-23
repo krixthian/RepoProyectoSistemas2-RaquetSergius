@@ -141,7 +141,8 @@
     }).render();
 
     // Gráfico de estado de clientes
-    const totalClientes = @json(array_sum($clientesEstadoData)); 
+const totalClientes = @json(array_sum($clientesEstadoData->toArray()));
+
     const activos = @json($clientesEstadoData[0] ?? 0);
     const porcentajeActivos = totalClientes > 0 ? Math.round((activos / totalClientes) * 100) : 0;
 
