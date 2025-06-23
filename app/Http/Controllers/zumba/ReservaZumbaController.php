@@ -16,18 +16,34 @@ class ReservaZumbaController extends Controller
      *
      * @return \Illuminate\View\View
      */
-    public function index()
+    public function index(Request $request)
     {
-        $reservas = InscripcionClase::with([
-            'claseZumba.instructor',
-            'claseZumba.area',
-            'cliente'
-        ])
-            ->orderBy('fecha_inscripcion', 'desc')
-            ->get();
+        $query = InscripcionClase::with('cliente', 'claseZumba.instructor', 'claseZumba.area')
+            ->orderBy('fecha_clase', 'desc');
 
-        // La vista debe estar en 'zumba.reservas.index' para ser consistente
-        return view('zumba.reservas.index', compact('reservas'));
+        // Filtro por nombre de cliente
+        if ($request->filled('cliente_nombre')) {
+            $query->whereHas('cliente', function ($q) use ($request) {
+                $q->where('nombre', 'like', '%' . $request->cliente_nombre . '%');
+            });
+        }
+
+        // Filtro por rango de fechas de la clase
+        if ($request->filled('fecha_inicio')) {
+            $query->whereDate('fecha_clase', '>=', $request->fecha_inicio);
+        }
+        if ($request->filled('fecha_fin')) {
+            $query->whereDate('fecha_clase', '<=', $request->fecha_fin);
+        }
+
+        // Filtro por estado
+        if ($request->filled('estado')) {
+            $query->where('estado', $request->estado);
+        }
+
+        $inscripciones = $query->paginate(15)->appends($request->query());
+
+        return view('zumba.reservas.index', compact('inscripciones'));
     }
 
     /**

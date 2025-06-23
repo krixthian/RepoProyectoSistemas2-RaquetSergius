@@ -11,7 +11,7 @@
         }
 
         .report-card {
-            background-color: var(--surface-color);
+            background-color: var(--text-color);
             padding: 1.5rem;
             border-radius: 12px;
             border: 1px solid var(--border-color);

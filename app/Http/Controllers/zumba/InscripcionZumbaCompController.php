@@ -10,6 +10,7 @@ use App\Models\Cliente;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use App\Models\PuntosLog; // Asegúrate de que este modelo exista
 
 // --- MODELOS AJUSTADOS A TU PROYECTO ---
 use App\Models\ClaseZumba;
@@ -19,13 +20,7 @@ use App\Models\AreaZumba; // Corregido
 
 class InscripcionZumbaCompController extends Controller
 {
-    // ... (aquí va todo tu código existente: index, opciones, verComprobante, etc.)
-    // ... (no es necesario que lo copies de nuevo, solo asegúrate de que esté aquí)
-    
-    /**
-     * Muestra una lista de comprobantes de pago pendientes de revisión.
-     * Cada fila es un comprobante que puede agrupar varias inscripciones.
-     */
+
     public function index(Request $request)
     {
         $query = InscripcionClase::where('estado', 'Pendiente')
@@ -171,7 +166,7 @@ class InscripcionZumbaCompController extends Controller
         $instructores = Instructor::all();
         // Usamos tu modelo AreaZumba y filtramos por las que están disponibles
         $areas = AreaZumba::where('disponible', true)->get();
-        
+
         $diasDeLaSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
         // Retornamos la vista y le pasamos los datos
@@ -185,15 +180,15 @@ class InscripcionZumbaCompController extends Controller
     {
         // 1. Validamos los datos del formulario (ajustado a tu modelo ClaseZumba)
         $validatedData = $request->validate([
-            'area_id'       => 'required|exists:areas_zumba,area_id',
+            'area_id' => 'required|exists:areas_zumba,area_id',
             'instructor_id' => 'required|exists:instructores,instructor_id',
-            'diasemama'     => 'required|string',
-            'hora_inicio'   => 'required|date_format:H:i',
-            'hora_fin'      => 'required|date_format:H:i|after:hora_inicio',
-            'precio'        => 'required|numeric|min:0',
-            'cupo_maximo'   => 'required|integer|min:1',
+            'diasemama' => 'required|string',
+            'hora_inicio' => 'required|date_format:H:i',
+            'hora_fin' => 'required|date_format:H:i|after:hora_inicio',
+            'precio' => 'required|numeric|min:0',
+            'cupo_maximo' => 'required|integer|min:1',
         ]);
-        
+
         // Asignamos el estado 'habilitado' por defecto, como en tu modelo
         $validatedData['habilitado'] = true;
 
@@ -202,8 +197,88 @@ class InscripcionZumbaCompController extends Controller
 
         // 3. Redirigimos al usuario con un mensaje de éxito
         return redirect()->route('zumba.opciones')
-                       ->with('success', '¡Nuevo horario de clase definido correctamente!');
+            ->with('success', '¡Nuevo horario de clase definido correctamente!');
     }
 
-    // ============= FIN: MÉTODOS AJUSTADOS =============
+    public function hoy()
+    {
+        $inscripcionesHoy = InscripcionClase::with(['cliente', 'claseZumba.instructor'])
+            ->whereDate('fecha_clase', Carbon::today())
+            ->orderBy('fecha_inscripcion', 'desc')
+            ->get();
+
+        return view('zumba.hoy', compact('inscripcionesHoy'));
+    }
+
+    /**
+     * Muestra el formulario para marcar la asistencia de una inscripción.
+     */
+    public function marcarAsistenciaForm(InscripcionClase $inscripcion)
+    {
+        // Cargar relaciones para mostrar detalles completos
+        $inscripcion->load(['cliente', 'claseZumba.instructor', 'claseZumba.area']);
+        return view('zumba.asistencia', compact('inscripcion'));
+    }
+
+    /**
+     * Actualiza el estado de una inscripción y asigna puntos si asistió.
+     */
+    public function actualizarEstado(Request $request, InscripcionClase $inscripcion)
+    {
+        $request->validate([
+            'estado' => 'required|string|in:Asistió,No Asistió',
+        ]);
+
+        // NOTA: Asumiré que quieres guardar este nuevo estado en la columna 'estado_pago'
+        // Si tienes otra columna como 'estado_asistencia', cambia 'estado_pago' por ese nombre.
+        $columnaEstado = 'estado_pago';
+
+        $successMessage = 'El estado de la inscripción ha sido actualizado.';
+
+        DB::beginTransaction();
+        try {
+            $inscripcion->update([$columnaEstado => $request->estado]);
+
+            if ($request->estado === 'Asistió' && $inscripcion->cliente) {
+                $puntosGanados = 5; // 5 puntos fijos por clase asistida
+                $cliente = $inscripcion->cliente;
+                $puntosAntes = $cliente->puntos;
+
+                $cliente->increment('puntos', $puntosGanados);
+
+                PuntosLog::create([
+                    'cliente_id' => $cliente->cliente_id,
+                    'inscripcion_clase_id' => $inscripcion->inscripcion_id, // Columna correcta para el log
+                    'accion' => 'Asistencia a Clase de Zumba',
+                    'puntos_cambio' => $puntosGanados,
+                    'puntos_antes' => $puntosAntes,
+                    'puntos_despues' => $cliente->fresh()->puntos, // Usar fresh() para obtener el valor actualizado
+                    'detalle' => "Puntos ganados por asistir a la clase de zumba",
+                    'fecha' => now(),
+                ]);
+
+                $successMessage = "Estado actualizado. Se asignaron {$puntosGanados} puntos a {$cliente->nombre}.";
+
+                // Enviar notificación por WhatsApp
+                if ($cliente->telefono) {
+                    $whatsappMessage = "¡Gracias por asistir a tu clase de Zumba, {$cliente->nombre}! Has ganado {$puntosGanados} puntos de fidelidad. Tu saldo actual es de " . ($cliente->fresh()->puntos) . " puntos.";
+                    try {
+                        app('App\Http\Controllers\Chatbot\whatsappController')->sendWhatsAppMessage($cliente->telefono, $whatsappMessage);
+                        $successMessage .= " Notificación enviada.";
+                    } catch (\Exception $e) {
+                        Log::error("Fallo al enviar notificación de puntos (Zumba) al cliente {$cliente->cliente_id}: " . $e->getMessage());
+                        $successMessage .= " La notificación por WhatsApp no pudo ser enviada.";
+                    }
+                }
+            }
+
+            DB::commit();
+            return redirect()->route('zumba.asistencia.hoy')->with('success', $successMessage);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::critical("Error CRÍTICO al actualizar estado/puntos de inscripción #{$inscripcion->inscripcion_id}: " . $e->getMessage());
+            return redirect()->route('zumba.asistencia.hoy')->with('error', 'Ocurrió un error grave al procesar la asistencia.');
+        }
+    }
 }

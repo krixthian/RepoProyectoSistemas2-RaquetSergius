@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Crear Nueva Reserva')
+@section('title', 'Crear Nueva Inscripcion de Zumba')
 
 @push('styles')
     <style>
@@ -153,7 +153,8 @@
                         <select id="cliente_id" name="cliente_id" required>
                             <option value="">-- Seleccione un cliente --</option>
                             @foreach ($clientes as $cliente)
-                                <option value="{{ $cliente->cliente_id }}" {{ old('cliente_id') == $cliente->cliente_id ? 'selected' : '' }}>
+                                <option value="{{ $cliente->cliente_id }}"
+                                    {{ old('cliente_id') == $cliente->cliente_id ? 'selected' : '' }}>
                                     {{ $cliente->nombre }}
                                 </option>
                             @endforeach
@@ -164,7 +165,8 @@
                         <select id="clase_id" name="clase_id" required>
                             <option value="">-- Seleccione una clase --</option>
                             @foreach ($clases as $clase)
-                                <option value="{{ $clase->clase_id }}" {{ old('clase_id') == $clase->clase_id ? 'selected' : '' }}>
+                                <option value="{{ $clase->clase_id }}"
+                                    {{ old('clase_id') == $clase->clase_id ? 'selected' : '' }}>
                                     {{ $clase->diasemama }} ({{ $clase->hora_inicio->format('h:i A') }}) - Instr:
                                     {{ $clase->instructor->nombre }}
                                 </option>
@@ -173,7 +175,8 @@
                     </div>
                     <div class="form-group">
                         <label for="fecha_clase">Fecha de la Clase</label>
-                        <input type="date" id="fecha_clase" name="fecha_clase" value="{{ old('fecha_clase') }}" required>
+                        <input type="date" id="fecha_clase" name="fecha_clase" value="{{ old('fecha_clase') }}"
+                            required>
                     </div>
                     <div class="form-group">
                         <label for="monto_pagado">Monto Pagado (Bs.)</label>
@@ -186,7 +189,8 @@
                             <option value="">-- Seleccione un método --</option>
                             <option value="Efectivo" {{ old('metodo_pago') == 'Efectivo' ? 'selected' : '' }}>Efectivo
                             </option>
-                            <option value="Tarjeta" {{ old('metodo_pago') == 'Tarjeta' ? 'selected' : '' }}>Tarjeta</option>
+                            <option value="Tarjeta" {{ old('metodo_pago') == 'Tarjeta' ? 'selected' : '' }}>Tarjeta
+                            </option>
                             <option value="Transferencia" {{ old('metodo_pago') == 'Transferencia' ? 'selected' : '' }}>
                                 Transferencia</option>
                             <option value="QR" {{ old('metodo_pago') == 'QR' ? 'selected' : '' }}>QR</option>

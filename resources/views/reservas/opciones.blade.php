@@ -107,14 +107,14 @@
             </a>
 
 
-            <div class="option-card">
-                <h2>OPCION4</h2>
-                <p>safdsdfasdfafdsfdsfsdafds</p>
+            <a href="{{ route('reservas.hoy') }}" class="option-card">
+                <h2>Asistencia de Hoy</h2>
+                <p>Revisa las reservas del día y marca la asistencia de los clientes.</p>
                 <span class="status status-implemented">------------------------------------------</span>
                 <div style="margin-top: 10px;">
-                    <span class="btn-manage">Gestionar</span>
+                    <span class="btn-manage">Ver Hoy</span>
                 </div>
-            </div>
+            </a>
 
 
 

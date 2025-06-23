@@ -24,6 +24,10 @@ use App\Http\Controllers\reservasControllers\ReservaControllerComp;
 use App\Http\Controllers\zumba\InscripcionZumbaCompController;
 use App\Http\Controllers\zumba\ReservaZumbaController;
 use App\Http\Controllers\PuntosController;
+use App\Http\Controllers\InstructorController;
+use App\Http\Controllers\ZumbaOpcionesController;
+use App\Http\Controllers\ConfiguracionController;
+use App\Http\Controllers\ClaseZumbaController;
 
 
 Route::get('/login', function () {
@@ -36,6 +40,13 @@ Route::get('/login', function () {
 
 // --- RUTAS PROTEGIDAS  ---
 Route::middleware(['auth'])->group(function () {
+
+    Route::post('/torneos/{torneo}/add-equipo', [App\Http\Controllers\TorneoController::class, 'addEquipo'])->name('torneos.addEquipo');
+    Route::get('/configuracion', [ConfiguracionController::class, 'index'])->name('configuracion.index');
+    Route::post('/configuracion/update', [ConfiguracionController::class, 'updateImagenes'])->name('configuracion.update');
+
+    Route::resource('clases-zumba', ClaseZumbaController::class)->parameters(['clases-zumba' => 'clases_zumba']);
+
     //opciones clientes
     Route::prefix('/clientes')->name('clientes.')->group(function () {
         Route::get('/opciones', [PuntosController::class, 'opciones'])->name('opciones');
@@ -64,17 +75,27 @@ Route::middleware(['auth'])->group(function () {
 
     Route::post('/reservas/{id_reserva}/confirmar', [ReservaControllerComp::class, 'confirmarReserva'])->name('reservas.confirmar');
     Route::post('/reservas/{id_reserva}/rechazar', [ReservaControllerComp::class, 'rechazarReserva'])->name('reservas.rechazar');
-
+    //INSTRUCTORES
+    Route::resource('instructores', InstructorController::class);
     //RESERVAS
+    Route::get('/reservas/hoy', [App\Http\Controllers\ReservaController::class, 'hoy'])->name('reservas.hoy');
+    Route::get('/reservas/hoy/{reserva}/asistencia', [App\Http\Controllers\ReservaController::class, 'marcarAsistenciaForm'])->name('reservas.asistencia.form');
+    Route::post('/reservas/{reserva}/actualizar-estado', [App\Http\Controllers\ReservaController::class, 'actualizarEstado'])->name('reservas.actualizarEstado');
+    Route::post('/reservas/{reserva}/actualizar-estado', [App\Http\Controllers\ReservaController::class, 'actualizarEstado'])->name('reservas.actualizarEstado');
+
     Route::resource('reservas', ReservaController::class);
 
     // --- RUTAS ZUMBA ---
     Route::prefix('/zumba')->name('zumba.')->group(function () {
-        Route::get('/opciones', [InscripcionZumbaCompController::class, 'opciones'])->name('opciones');
+        Route::get('/opciones', [ZumbaOpcionesController::class, 'index'])->name('opciones');
+
         Route::get('/pendientes', [InscripcionZumbaCompController::class, 'index'])->name('pendientes');
         Route::get('/ver-comprobante/{cliente_id}/{comprobante_hash}', [InscripcionZumbaCompController::class, 'verComprobante'])->name('verComprobante');
         Route::post('/confirmar/{cliente_id}/{comprobante_hash}', [InscripcionZumbaCompController::class, 'confirmarInscripciones'])->name('pendientes.confirmar');
         Route::post('/rechazar/{cliente_id}/{comprobante_hash}', [InscripcionZumbaCompController::class, 'rechazarInscripciones'])->name('pendientes.rechazar');
+        Route::get('/hoy', [InscripcionZumbaCompController::class, 'hoy'])->name('asistencia.hoy');
+        Route::get('/hoy/{inscripcion}/asistencia', [InscripcionZumbaCompController::class, 'marcarAsistenciaForm'])->name('asistencia.form');
+        Route::post('/inscripciones/{inscripcion}/actualizar-estado', [InscripcionZumbaCompController::class, 'actualizarEstado'])->name('inscripciones.actualizarEstado');
 
         // Horarios de clase
         Route::get('/agendar', [InscripcionZumbaCompController::class, 'showAgendarForm'])->name('agendar');

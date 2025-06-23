@@ -1,37 +1,120 @@
 @extends('layouts.app')
 
+@section('title', 'Detalles del Torneo')
+
+@push('styles')
+    <style>
+        .torneo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        .details-card {
+            background-color: var(--surface-color);
+            padding: 2rem;
+            border-radius: 12px;
+        }
+
+        @media (max-width: 992px) {
+            .torneo-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .equipo-lista li,
+        .partido-lista li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+    </style>
+@endpush
+
 @section('content')
-<div class="container">
-    <h1>Detalles del Torneo</h1>
-
-    <div class="card">
-        <div class="card-header">
-            Torneo ID: {{ $torneo->torneo_id }}
+    <div class="container">
+        <div class="welcome-message">
+            <h1>{{ $torneo->nombre }}</h1>
+            <p>Estado: <span
+                    class="status status-{{ str_replace(' ', '-', strtolower($torneo->estado)) }}">{{ $torneo->estado }}</span>
+            </p>
         </div>
-        <div class="card-body">
-            <h5 class="card-title">{{ $torneo->categoria }} - {{ $torneo->deporte }}</h5>
-            <p class="card-text"><strong>Evento ID:</strong> {{ $torneo->evento_id }}</p>
-            {{-- <p class="card-text"><strong>Nombre del Evento:</strong> {{ $torneo->evento->nombre_evento ?? 'No especificado' }}</p> --}}
-            <p class="card-text"><strong>Número de Equipos:</strong> {{ $torneo->num_equipos }}</p>
-            <p class="card-text"><strong>Estado:</strong> {{ $torneo->estado }}</p>
-            <p class="card-text"><strong>Creado el:</strong> {{ $torneo->created_at->format('d/m/Y H:i') }}</p>
-            <p class="card-text"><strong>Última actualización:</strong> {{ $torneo->updated_at->format('d/m/Y H:i') }}</p>
 
-            {{-- <h5>Equipos:</h5> --}}
-            {{-- @if($torneo->equipos && $torneo->equipos->count() > 0) --}}
-            {{--    <ul> --}}
-            {{--        @foreach($torneo->equipos as $equipo) --}}
-            {{--            <li>{{ $equipo->nombre_equipo }}</li> --}}
-            {{--        @endforeach --}}
-            {{--    </ul> --}}
-            {{-- @else --}}
-            {{--    <p>No hay equipos registrados para este torneo aún.</p> --}}
-            {{-- @endif --}}
+        @if (session('success'))
+            <div class="alert alert-success">{{ session('success') }}</div>
+        @endif
+        @if (session('error'))
+            <div class="alert alert-danger">{{ session('error') }}</div>
+        @endif
+
+        <div class="torneo-grid">
+            <div class="details-card">
+                <h3>Equipos Inscritos ({{ $torneo->equipos->count() }} / {{ $torneo->num_equipos }})</h3>
+
+                @if ($torneo->estado == 'Abierto')
+                    <form action="{{ route('torneos.addEquipo', $torneo) }}" method="POST" class="filter-form my-4">
+                        @csrf
+                        <select name="equipo_id" required>
+                            <option value="">Seleccionar equipo para añadir...</option>
+                            @foreach ($equiposDisponibles as $equipo)
+                                <option value="{{ $equipo->equipo_id }}">{{ $equipo->nombre }}</option>
+                            @endforeach
+                        </select>
+                        <button type="submit" class="button">Añadir Equipo</button>
+                    </form>
+                @else
+                    <p class="text-muted my-4">La inscripción está cerrada.</p>
+                @endif
+
+                <ul class="equipo-lista list-unstyled">
+                    @forelse($torneo->equipos as $equipo)
+                        <li>{{ $equipo->nombre }}</li>
+                    @empty
+                        <li>No hay equipos inscritos todavía.</li>
+                    @endforelse
+                </ul>
+            </div>
+
+            <div class="details-card">
+                <h3>Partidos del Torneo</h3>
+
+                @if ($torneo->partidos->isEmpty())
+                    @if ($torneo->estado == 'Abierto')
+                        <form action="{{ route('torneos.generarPartidos', $torneo) }}" method="POST">
+                            @csrf
+                            <button type="submit" class="button"
+                                onclick="return confirm('¿Estás seguro de generar los partidos? Esta acción cerrará las inscripciones y comenzará el torneo.')">Generar
+                                Partidos</button>
+                        </form>
+                    @else
+                        <p>Los partidos aún no han sido generados.</p>
+                    @endif
+                @else
+                    <ul class="partido-lista list-unstyled">
+                        @foreach ($torneo->partidos as $partido)
+                            <li>
+                                <span>
+                                    {{ $partido->equipoLocal->nombre ?? 'N/A' }}
+                                    <strong>vs</strong>
+                                    {{ $partido->equipoVisitante->nombre ?? 'N/A' }}
+                                </span>
+                                @if ($partido->estado == 'Finalizado')
+                                    <span class="status status-active">{{ $partido->resultado_local ?? 0 }} -
+                                        {{ $partido->resultado_visitante ?? 0 }}</span>
+                                @else
+                                    <span class="status status-pending">{{ $partido->estado }}</span>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </div>
         </div>
-        <div class="card-footer">
-            <a href="{{ route('torneos.edit', $torneo) }}" class="btn btn-warning">Editar</a>
-            <a href="{{ route('torneos.index') }}" class="btn btn-secondary">Volver a la lista</a>
+
+        <div class="mt-4">
+            <a href="{{ route('torneos.index') }}" class="button" style="background-color: #6c757d;">Volver a Torneos</a>
         </div>
     </div>
-</div>
 @endsection

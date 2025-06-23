@@ -124,22 +124,8 @@
                 </div>
             </a>
 
-            <a href="{{ route('zumba.agendar') }}" class="option-card">
-                <h2>Agendar Sesion de Zumba</h2>
-                <p>Permite agendar nuevas sesiones de Zumba para los clientes.</p>
-                <span class="status status-implemented">------------------------------------------</span>
-                <div style="margin-top: 10px;">
-                    <span class="btn-manage">Agendar</span>
-                </div>
-            </a>
-            <div class="option-card">
-                <h2>Gestión de Instructores</h2>
-                <p>Administra la información y especialidades de los instructores.</p>
-                <span class="status status-implemented">------------------------------------------</span>
-                <div style="margin-top: 10px;">
-                    <span class="btn-manage ">Gestionar</span>
-                </div>
-            </div>
+
+
 
             <a href="/torneos" class="option-card">
 
@@ -174,7 +160,14 @@
                 </div>
 
             </a>
-
+            <a href="{{ route('configuracion.index') }}" class="option-card">
+                <h2>Configurar imagenes</h2>
+                <p>configurar las imagenes del qr y horarios de zumba</p>
+                <span class="status status-implemented">------------------------------------------</span>
+                <div style="margin-top: 10px;">
+                    <span class="btn-manage">Gestionar</span>
+                </div>
+            </a>
 
         </div>
     </div>

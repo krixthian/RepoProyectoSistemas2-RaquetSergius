@@ -4,13 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\Torneo;
 use Illuminate\Http\Request;
+use App\Models\Equipo;
+use App\Models\Partido;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class TorneoController extends Controller
 {
     /**
      * Display a listing of the resource.
      *
-     * @return \Illuminate\Http\Response
+
      */
     public function index()
     {
@@ -21,7 +25,7 @@ class TorneoController extends Controller
     /**
      * Show the form for creating a new resource.
      *
-     * @return \Illuminate\Http\Response
+
      */
     public function create()
     {
@@ -33,7 +37,7 @@ class TorneoController extends Controller
      * Store a newly created resource in storage.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
+
      */
     public function store(Request $request)
     {
@@ -52,18 +56,48 @@ class TorneoController extends Controller
      * Display the specified resource.
      *
      * @param  \App\Models\Torneo  $torneo
-     * @return \Illuminate\Http\Response
+
      */
     public function show(Torneo $torneo)
     {
-        return view('torneos.show', compact('torneo'));
+        // Cargar equipos inscritos y partidos generados
+        $torneo->load('equipos', 'partidos.equipoLocal', 'partidos.equipoVisitante');
+
+        // Obtener todos los equipos que NO están en este torneo para el dropdown
+        $equiposInscritosIds = $torneo->equipos->pluck('equipo_id')->all();
+        $equiposDisponibles = Equipo::whereNotIn('equipo_id', $equiposInscritosIds)->get();
+
+        return view('torneos.show', compact('torneo', 'equiposDisponibles'));
     }
+
+    /**
+     * Añade un equipo a un torneo.
+     */
+    public function addEquipo(Request $request, Torneo $torneo)
+    {
+        $request->validate(['equipo_id' => 'required|exists:equipos,equipo_id']);
+
+        // Verificar si el torneo ya está lleno
+        if ($torneo->equipos()->count() >= $torneo->num_equipos) {
+            return back()->with('error', 'El torneo ya ha alcanzado el número máximo de equipos.');
+        }
+
+        // Añadir el equipo
+        $torneo->equipos()->attach($request->equipo_id);
+
+        return back()->with('success', 'Equipo añadido al torneo exitosamente.');
+    }
+
+    /**
+     * Genera los partidos para un torneo en formato todos contra todos.
+     */
+
 
     /**
      * Show the form for editing the specified resource.
      *
      * @param  \App\Models\Torneo  $torneo
-     * @return \Illuminate\Http\Response
+
      */
     public function edit(Torneo $torneo)
     {
@@ -75,7 +109,7 @@ class TorneoController extends Controller
      *
      * @param  \Illuminate\Http\Request  $request
      * @param  \App\Models\Torneo  $torneo
-     * @return \Illuminate\Http\Response
+
      */
     public function update(Request $request, Torneo $torneo)
     {
@@ -99,7 +133,7 @@ class TorneoController extends Controller
      * Remove the specified resource from storage.
      *
      * @param  \App\Models\Torneo  $torneo
-     * @return \Illuminate\Http\Response
+
      */
     public function destroy(Torneo $torneo)
     {

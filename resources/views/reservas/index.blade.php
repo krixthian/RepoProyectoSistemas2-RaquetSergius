@@ -184,21 +184,21 @@
         .button-danger:hover {
             background-color: #c7001e;
         }
+
         .search-form select {
-    padding: 0.75rem;
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-    background-color: var(--surface-color);
-    color: var(--text-color);
-    font-size: 1rem;
-}
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: var(--surface-color);
+            color: var(--text-color);
+            font-size: 1rem;
+        }
 
-.search-form select:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px #00aaff;
-}
-
+        .search-form select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px #00aaff;
+        }
     </style>
 @endpush
 
@@ -225,6 +225,8 @@
             <option value="pendiente" {{ request('estado') == 'pendiente' ? 'selected' : '' }}>Pendiente</option>
             <option value="confirmada" {{ request('estado') == 'confirmada' ? 'selected' : '' }}>Confirmada</option>
             <option value="cancelada" {{ request('estado') == 'cancelada' ? 'selected' : '' }}>Cancelada</option>
+            <option value="Completada" {{ request('estado') == 'Completada' ? 'selected' : '' }}>Completada</option>
+            <option value="No Asistio" {{ request('estado') == 'No Asistio' ? 'selected' : '' }}>No Asistio</option>
         </select>
 
         <select name="pago_completo">
@@ -238,7 +240,7 @@
 
         <button type="submit" class="button">Buscar</button>
 
-        @if(request()->hasAny(['cliente_nombre', 'estado', 'pago_completo', 'metodo_pago']))
+        @if (request()->hasAny(['cliente_nombre', 'estado', 'pago_completo', 'metodo_pago']))
             <a href="{{ route('reservas.index') }}" class="button-link button-secondary">Limpiar Filtros</a>
         @endif
     </form>
@@ -281,7 +283,8 @@
                         <a href="{{ route('reservas.edit', $res->reserva_id) }}">Editar</a>
                         <span class="eliminar-link" onclick="mostrarConfirmacion(this)">Eliminar</span>
 
-                        <form action="{{ route('reservas.destroy', $res->reserva_id) }}" method="POST" class="form-eliminar">
+                        <form action="{{ route('reservas.destroy', $res->reserva_id) }}" method="POST"
+                            class="form-eliminar">
                             @csrf
                             @method('DELETE')
                             <span>¿Confirmar?</span>
@@ -294,7 +297,7 @@
             @empty
                 <tr>
                     <td colspan="11" style="text-align: center; padding: 2rem;">
-                        @if(request('cliente_nombre'))
+                        @if (request('cliente_nombre'))
                             No hay reservas que coincidan con "{{ request('cliente_nombre') }}".
                         @else
                             No hay reservas registradas.

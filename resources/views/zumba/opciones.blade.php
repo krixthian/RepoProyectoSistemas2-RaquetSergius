@@ -65,64 +65,72 @@
 @endpush
 
 @section('content')
-    <div class="admin-panel-container">
+    <div class="container">
         <div class="welcome-message">
-            <h1 style="color: var(--blueraquet-color);">Panel de Administración de Zumba</h1>
-            <p>Selecciona una opción para comenzar a gestionar el sistema.</p>
+            <h1 style="color: var(--blueraquet-color);">Gestión de Zumba</h1>
+            <p>Selecciona una opción para administrar clases, instructores, inscripciones y más.</p>
         </div>
+
+        @if (session('success'))
+            <div class="alert alert-success">{{ session('success') }}</div>
+        @endif
+        @if (session('error'))
+            <div class="alert alert-danger">{{ session('error') }}</div>
+        @endif
 
         <div class="management-options">
 
             <a href="{{ route('zumba.reservas.index') }}" class="option-card">
-                <h2>Administrar Reservas</h2>
-                <br>
-                <p>Administra las reservas y sus datos.</p>
-                <span class="status status-implemented">Implementado</span>
+                <h2>Gestión de inscripciones</h2>
+                <p>gestionar inscripciones de Zumba.</p>
+                <span class="status status-implemented">------------------------------------------</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Gestionar</span>
                 </div>
             </a>
-
-
-
+            <a href="{{ route('instructores.index') }}" class="option-card">
+                <h2>Gestión de Instructores</h2>
+                <p>Añade, edita o elimina instructores de Zumba.</p>
+                <span class="status status-implemented">------------------------------------------</span>
+                <div style="margin-top: 10px;">
+                    <span class="btn-manage">Gestionar</span>
+                </div>
+            </a>
 
             <a href="{{ route('zumba.pendientes') }}" class="option-card">
-                <h2>Inscripciones pendientes</h2>
-                <p>Confirmar y Rechazar pendientes</p>
-                <span class="status status-implemented">Pendiente</span>
+                <h2>Revisión de Pagos</h2>
+                <p>Aprueba o rechaza los pagos de las inscripciones a clases.</p>
+                <span class="status status-implemented">------------------------------------------</span>
                 <div style="margin-top: 10px;">
-                    <span class="btn-manage">Ver Lista</span>
+                    <span class="btn-manage">Revisar Pagos</span>
                 </div>
             </a>
 
 
-            <a href="{{ route('clientes.index') }}" class="option-card">
-                <h2>sadffdsdsfdfsfdss</h2>
-                <br>
-                <p>asafsddfsadfsdfssdfdsf</p>
-                <span class="status status-implemented">Implementado</span>
+            <a href="{{ route('zumba.agendar') }}" class="option-card">
+                <h2>Gestión de Clases</h2>
+                <p>Crea, modifica o cancela las clases de Zumba disponibles.</p>
+                <span class="status status-implemented">------------------------------------------</span>
+                <div style="margin-top: 10px;">
+                    <span class="btn-manage">Agendar</span>
+                </div>
+            </a>
+            <a href="{{ route('zumba.asistencia.hoy') }}" class="option-card">
+                <h2>Asistencia de Hoy</h2>
+                <p>Revisa las inscripciones del día y marca la asistencia a clases.</p>
+                <span class="status status-implemented">------------------------------------------</span>
+                <div style="margin-top: 10px;">
+                    <span class="btn-manage">Ver Hoy</span>
+                </div>
+            </a>
+            <a href="{{ route('clases-zumba.index') }}" class="option-card">
+                <h2>Gestión de Clases</h2>
+                <p>Crea, modifica o cancela las clases de Zumba disponibles.</p>
+                <span class="status status-implemented">------------------------------------------</span>
                 <div style="margin-top: 10px;">
                     <span class="btn-manage">Gestionar</span>
                 </div>
-
             </a>
-
-
-            <div class="option-card">
-                <h2>OPCION4</h2>
-                <br>
-                <p>safdsdfasdfafdsfdsfsdafds</p>
-
-                <span class="status status-pending">Pendiente</span>
-                <div style="margin-top: 10px;">
-                    <span class="btn-manage disabled">Gestionar</span>
-                </div>
-            </div>
-
-
-
-
-
         </div>
     </div>
 @endsection
