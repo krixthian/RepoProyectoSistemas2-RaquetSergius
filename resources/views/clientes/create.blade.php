@@ -45,11 +45,20 @@
             <label for="nombre">Nombre *</label>
             <input type="text" name="nombre" id="nombre" class="form-control" value="{{ old('nombre') }}" required>
         </div>
-
         <div class="mb-3">
-            <label for="telefono">Teléfono</label>
-            <input type="text" name="telefono" max="99999999" id="telefono" class="form-control" value="{{ old('telefono') }}">
-        </div>
+    <label for="telefono">Teléfono</label>
+    <input type="tel"
+           name="telefono"
+           id="telefono"
+           class="form-control"
+           value="{{ old('telefono') }}"
+           maxlength="8"
+           pattern="\d{8}"
+           inputmode="numeric"
+           title="Ingrese exactamente 8 números"
+           oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 8);">
+</div>
+
 
         <div class="mb-3">
             <label for="email">Email</label>

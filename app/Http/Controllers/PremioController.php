@@ -7,9 +7,16 @@ use Illuminate\Http\Request;
 
 class PremioController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $premios = Premio::all();
+        $query = Premio::query();
+
+        if ($request->has('search') && $request->search != '') {
+            $query->where('nombre', 'like', '%' . $request->search . '%');
+        }
+
+        $premios = $query->get();
+
         return view('premios.index', compact('premios'));
     }
 
@@ -29,7 +36,7 @@ class PremioController extends Controller
 
         Premio::create($request->all());
 
-        return redirect()->route('premios.index')->with('success', 'Premio criado con éxito');
+        return redirect()->route('premios.index')->with('success', 'Premio creado con éxito');
     }
 
     public function edit(Premio $premio)

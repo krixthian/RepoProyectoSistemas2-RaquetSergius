@@ -15,6 +15,17 @@
         <i class="fas fa-plus-circle me-2"></i>Nuevo Cliente
     </a>
 </header>
+<!-- Buscador por teléfono -->
+<form method="GET" action="{{ route('clientes.index') }}" style="margin: 20px 0; display: flex; gap: 10px; align-items: center;">
+    <input type="text" name="telefono" placeholder="Buscar por teléfono..."
+           value="{{ request('telefono') }}"
+           style="padding: 10px; background: #333; color: #fff; border: 1px solid #007bff; border-radius: 5px; width: 250px;">
+    <button type="submit"
+            style="padding: 10px 20px; background: #007bff; color: #fff; border: none; border-radius: 5px; font-weight: bold;">
+        Buscar
+    </button>
+</form>
+
             <div class="card-header">
                 <h2><i class="fas fa-list-ol me-2"></i>Listado Completo</h2>
             </div>
