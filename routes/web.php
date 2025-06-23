@@ -41,6 +41,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
     Route::get('/admin/empleados', [IndexEmpleadoController::class, 'index'])->name('admin.empleados.index');
 
+    Route::get('/canchas/disponibilidad', [\App\Http\Controllers\DisponibilidadController::class, 'index'])->name('canchas.disponibilidad');
+
     Route::get('/reservas/opciones', [ReservaControllerComp::class, 'opciones'])->name('admin.reservas.opciones');
     Route::get('/reservas/opciones/pendientes', [ReservaControllerComp::class, 'index'])->name('admin.reservas.pendientes');
     Route::get('/reservas/opciones/pendientes/{id_reserva}', [ReservaControllerComp::class, 'verReserva'])->name('admin.reservas.ver');

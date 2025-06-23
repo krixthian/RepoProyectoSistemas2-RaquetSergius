@@ -11,25 +11,42 @@ use Illuminate\Support\Facades\Log;
 
 class ReservaController extends Controller
 {
-    public function index(Request $request)
+   public function index(Request $request)
 {
     $query = Reserva::with(['cliente', 'cancha'])
                     ->orderBy('fecha', 'desc')
                     ->orderBy('hora_inicio', 'desc');
 
-    // Filtro por nombre de cliente (si viene en el request)
+    // Filtro por nombre de cliente
     if ($request->filled('cliente_nombre')) {
         $nombre = $request->cliente_nombre;
 
         $query->whereHas('cliente', function ($q) use ($nombre) {
-            $q->where('nombre', 'like', '%' . $nombre . '%');
+            $q->where('nombre', 'like', '%' . $nombre . '%')
+              ->orWhere('apellido', 'like', '%' . $nombre . '%');
         });
+    }
+
+    // Filtro por estado
+    if ($request->filled('estado')) {
+        $query->where('estado', $request->estado);
+    }
+
+    // Filtro por pago completo (0 o 1)
+    if ($request->filled('pago_completo')) {
+        $query->where('pago_completo', $request->pago_completo);
+    }
+
+    // Filtro por método de pago
+    if ($request->filled('metodo_pago')) {
+        $query->where('metodo_pago', 'like', '%' . $request->metodo_pago . '%');
     }
 
     $reservas = $query->get();
 
     return view('reservas.index', compact('reservas'));
 }
+
 
 
     public function create()
