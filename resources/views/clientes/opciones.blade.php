@@ -63,6 +63,19 @@
                     <span class="btn-manage">Ver Logs</span>
                 </div>
             </a>
+
+            <div class="option-card">
+                <h2>Gestión de Premios</h2>
+                <p>Administrar los premios disponibles para canjear.</p>
+                <span class="status status-implemented"> ------------------------------------------</span>
+                <div style="margin-top: 10px">
+                    <a href="{{ route('premios.index') }}" class="btn-manage">
+                        Gestionar
+                    </a>
+                </div>
+            </div>
+
+
         </div>
     </div>
 @endsection

@@ -114,27 +114,6 @@
                 </div>
             </a>
 
-            <div class="option-card">
-                <h2>Gestión de Premios</h2>
-                <p>Administrar los premios disponibles para canjear.</p>
-                <span class="status status-implemented"> ------------------------------------------</span>
-                <div style="margin-top: 10px">
-                    <a href="{{ route('premios.index') }}" class="btn-manage">
-                        Gestionar
-                    </a>
-                </div>
-            </div>
-
-
-
-            <div class="option-card">
-                <h2>Gestión de Áreas de Zumba</h2>
-                <p>Administra las áreas para clases de Zumba, capacidades y horarios.</p>
-                <span class="status status-implemented">------------------------------------------</span>
-                <div style="margin-top: 10px;">
-                    <span class="btn-manage ">Gestionar</span>
-                </div>
-            </div>
 
             <a href="{{ route('zumba.opciones') }}" class="option-card">
                 <h2>Gestión de Clases de Zumba</h2>

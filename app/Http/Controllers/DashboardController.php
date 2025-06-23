@@ -2,140 +2,100 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Request;
 use App\Models\Reserva;
-use App\Models\Cliente;
-use App\Models\Empleado;
+use App\Models\InscripcionClase;
+use App\Models\Cancha;
+use App\Models\ClaseZumba; // Asegúrate de importar el modelo ClaseZumba
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        // 1. Top 5 clientes que más reservaron
-        $topClientes = Cliente::select('clientes.nombre', DB::raw('COUNT(reservas.reserva_id) as total'))
-            ->join('reservas', 'clientes.cliente_id', '=', 'reservas.cliente_id')
-            ->groupBy('clientes.cliente_id','clientes.nombre')
-            ->orderByDesc('total')
-            ->limit(5)
-            ->get();
+        // 1. FILTROS DE FECHA
+        $fechaInicio = $request->input('fecha_inicio', Carbon::now()->subMonth()->toDateString());
+        $fechaFin = $request->input('fecha_fin', Carbon::now()->toDateString());
 
-        // 2. Reservas por fecha
-        $reservasPorFecha = Reserva::select('fecha', DB::raw('COUNT(*) as total'))
-            ->groupBy('fecha')
-            ->orderBy('fecha','asc')
-            ->get();
+        $fechaInicioCarbon = Carbon::parse($fechaInicio)->startOfDay();
+        $fechaFinCarbon = Carbon::parse($fechaFin)->endOfDay();
 
-        // 3. Estados de reservas
-        $estados = Reserva::select('estado', DB::raw('COUNT(*) as total'))
-            ->groupBy('estado')
-            ->get();
+        // --- SECCIÓN DE RESERVAS (WALLY) ---
+        $ingresosReservas = Reserva::whereBetween('fecha', [$fechaInicioCarbon, $fechaFinCarbon])
+            ->where('pago_completo', true)
+            ->sum('monto_total');
+        $totalReservas = Reserva::whereBetween('fecha', [$fechaInicioCarbon, $fechaFinCarbon])->count();
+        $demandaPorHora = Reserva::whereBetween('fecha', [$fechaInicioCarbon, $fechaFinCarbon])
+            ->select(DB::raw('HOUR(hora_inicio) as hora'), DB::raw('count(*) as total'))
+            ->groupBy('hora')->orderBy('hora')->pluck('total', 'hora')->all();
+        $reservasPorCancha = Cancha::select('nombre')
+            ->selectSub(function ($query) use ($fechaInicioCarbon, $fechaFinCarbon) {
+                $query->selectRaw('count(*)')->from('reservas')
+                    ->whereColumn('reservas.cancha_id', 'canchas.cancha_id')
+                    ->whereBetween('fecha', [$fechaInicioCarbon, $fechaFinCarbon]);
+            }, 'reservas_count')->get();
 
-        // 4. Uso de canchas (top 5)
-        $usoCanchas = Reserva::select('canchas.nombre', DB::raw('COUNT(reservas.reserva_id) as total'))
-            ->join('canchas','reservas.cancha_id','=','canchas.cancha_id')
-            ->groupBy('canchas.cancha_id','canchas.nombre')
-            ->orderByDesc('total')
-            ->limit(5)
-            ->get();
+        // --- SECCIÓN DE ZUMBA ---
+        // Usando la columna 'monto_pagado' que me indicaste.
+        // La condición del estado de pago sigue pendiente de tu confirmación.
+        $ingresosZumba = InscripcionClase::whereBetween('fecha_clase', [$fechaInicioCarbon, $fechaFinCarbon])
+            //->where('NOMBRE_COLUMNA_ESTADO_PAGO', 'VALOR_PAGADO') // <-- Sigue pendiente
+            ->sum('monto_pagado');
+        $totalInscripciones = InscripcionClase::whereBetween('fecha_clase', [$fechaInicioCarbon, $fechaFinCarbon])->count();
 
-        // 5. Cantidad de empleados por rol
-        $empleadosPorRol = Empleado::select('rol', DB::raw('COUNT(*) as total'))
-            ->groupBy('rol')
-            ->get();
+        // **NUEVO: Consulta para el gráfico de demanda de clases de Zumba**
+        $inscripcionesPorClase = ClaseZumba::withCount([
+            'inscripciones' => function ($query) use ($fechaInicioCarbon, $fechaFinCarbon) {
+                $query->whereBetween('fecha_clase', [$fechaInicioCarbon, $fechaFinCarbon]);
+            }
+        ])->get();
+        // **FIN DE LA NUEVA CONSULTA**
 
-        // 6. Clientes registrados por semana
-        $clientesPorSemana = Cliente::select(
-                DB::raw('YEAR(fecha_registro) as anio'),
-                DB::raw('WEEK(fecha_registro, 1) as semana'), // Usar modo ISO para semanas
-                DB::raw('CONCAT("Sem ", WEEK(fecha_registro, 1)) as semana_label'),
-                DB::raw('COUNT(*) as total')
-            )
-            ->groupBy('anio', 'semana', 'semana_label')
-            ->orderBy('anio', 'desc')
-            ->orderBy('semana', 'desc')
-            ->limit(8)
-            ->get();
+        // --- CÁLCULOS TOTALES Y GRÁFICOS ---
+        $ingresosTotales = $ingresosReservas + $ingresosZumba;
+        $ingresosDiariosData = $this->getIngresosDiarios($fechaInicioCarbon, $fechaFinCarbon);
 
-        // 7. Estado de clientes (activos/inactivos)
-        $clientesActivos = Cliente::select(
-                DB::raw('CASE WHEN cliente_frecuente = 1 THEN "Activo" ELSE "Inactivo" END as estado'),
-                DB::raw('COUNT(*) as total')
-            )
-            ->groupBy('estado')
-            ->get();
-
-        // Fallbacks para datos faltantes
-        // Top 5 clientes
-        if ($topClientes->isEmpty()) {
-            $topClientesLabels = ['Cliente A','Cliente B','Cliente C','Cliente D','Cliente E'];
-            $topClientesData   = [12,9,7,5,3];
-        } else {
-            $topClientesLabels = $topClientes->pluck('nombre');
-            $topClientesData   = $topClientes->pluck('total');
-        }
-
-        // Reservas por fecha
-        if ($reservasPorFecha->isEmpty()) {
-            $reservasFechaLabels = ['2025-01-01','2025-01-02','2025-01-03','2025-01-04','2025-01-05'];
-            $reservasFechaData   = [5,8,6,10,4];
-        } else {
-            $reservasFechaLabels = $reservasPorFecha->pluck('fecha');
-            $reservasFechaData   = $reservasPorFecha->pluck('total');
-        }
-
-        // Estados
-        if ($estados->isEmpty()) {
-            $estadosLabels = ['confirmada','cancelada','pendiente'];
-            $estadosData   = [15,4,6];
-        } else {
-            $estadosLabels = $estados->pluck('estado');
-            $estadosData   = $estados->pluck('total');
-        }
-
-        // Uso de canchas
-        if ($usoCanchas->isEmpty()) {
-            $usoCanchasLabels = ['Fútbol','Tenis','Padel','Basket','Vóley'];
-            $usoCanchasData   = [20,15,10,8,5];
-        } else {
-            $usoCanchasLabels = $usoCanchas->pluck('nombre');
-            $usoCanchasData   = $usoCanchas->pluck('total');
-        }
-
-        // Empleados por rol
-        if ($empleadosPorRol->isEmpty()) {
-            $empleadosLabels = ['Administrador', 'Recepcionista', 'Mantenimiento'];
-            $empleadosData = [2, 5, 3];
-        } else {
-            $empleadosLabels = $empleadosPorRol->pluck('rol');
-            $empleadosData = $empleadosPorRol->pluck('total');
-        }
-
-        // Clientes por semana
-        if ($clientesPorSemana->isEmpty()) {
-            $semanasLabels = ['Sem 45', 'Sem 46', 'Sem 47', 'Sem 48'];
-            $semanasData = [15, 22, 18, 25];
-        } else {
-            $semanasLabels = $clientesPorSemana->pluck('semana_label');
-            $semanasData = $clientesPorSemana->pluck('total');
-        }
-
-        // Estado de clientes
-        if ($clientesActivos->isEmpty()) {
-            $clientesEstadoLabels = ['Activo', 'Inactivo'];
-            $clientesEstadoData = [85, 15];
-        } else {
-            $clientesEstadoLabels = $clientesActivos->pluck('estado');
-            $clientesEstadoData = $clientesActivos->pluck('total');
+        $horasDelDia = array_fill(0, 24, 0);
+        foreach ($demandaPorHora as $hora => $total) {
+            $horasDelDia[$hora] = $total;
         }
 
         return view('dashboard', compact(
-            'topClientesLabels','topClientesData',
-            'reservasFechaLabels','reservasFechaData',
-            'estadosLabels','estadosData',
-            'usoCanchasLabels','usoCanchasData',
-            'empleadosLabels','empleadosData',
-            'semanasLabels','semanasData',
-            'clientesEstadoLabels','clientesEstadoData'
+            'fechaInicio',
+            'fechaFin',
+            'ingresosTotales',
+            'ingresosReservas',
+            'ingresosZumba',
+            'totalReservas',
+            'totalInscripciones',
+            'horasDelDia',
+            'reservasPorCancha',
+            'ingresosDiariosData',
+            'inscripcionesPorClase' // Se pasa la nueva variable a la vista
         ));
+    }
+
+    private function getIngresosDiarios(Carbon $inicio, Carbon $fin)
+    {
+        $reservas = Reserva::whereBetween('fecha', [$inicio, $fin])
+            ->where('pago_completo', true)
+            ->groupBy('date')->orderBy('date')
+            ->get([DB::raw("DATE(fecha) as date"), DB::raw("SUM(monto_total) as total")])
+            ->pluck('total', 'date');
+
+        $zumba = InscripcionClase::whereBetween('fecha_clase', [$inicio, $fin])
+            //->where('NOMBRE_COLUMNA_ESTADO_PAGO', 'VALOR_PAGADO') // <-- Sigue pendiente
+            ->groupBy('date')->orderBy('date')
+            ->get([DB::raw("DATE(fecha_clase) as date"), DB::raw("SUM(monto_pagado) as total")])
+            ->pluck('total', 'date');
+
+        $fechas = collect();
+        for ($date = $inicio->copy(); $date->lte($fin); $date->addDay()) {
+            $formattedDate = $date->toDateString();
+            $totalDiario = ($reservas->get($formattedDate) ?? 0) + ($zumba->get($formattedDate) ?? 0);
+            $fechas->put($formattedDate, $totalDiario);
+        }
+        return $fechas;
     }
 }
